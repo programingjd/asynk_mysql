@@ -1,7 +1,6 @@
 package info.jdavid.mysql
 
 import java.nio.ByteBuffer
-import java.util.*
 
 sealed class Packet {
 
@@ -9,6 +8,31 @@ sealed class Packet {
   internal interface FromClient {
     fun writeTo(buffer: ByteBuffer)
   }
+
+  class HandshakeResponse(private val database: String,
+                          private val username: String, private val authResponse: ByteArray,
+                          private val handshake: HandshakePacket): FromClient, Packet() {
+
+    override fun writeTo(buffer: ByteBuffer) {
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.putInt(Capabilities.clientCapabilities())
+      buffer.putInt(4092)
+      buffer.put(33.toByte()) // utf8_general_ci
+      buffer.put(ByteArray(23))
+      buffer.put(username.toByteArray())
+      buffer.put(0.toByte())
+      buffer.put(authResponse.size.toByte())
+      buffer.put(authResponse)
+      buffer.put(database.toByteArray())
+      buffer.put(0.toByte())
+      buffer.put(handshake.auth?.toByteArray())
+      buffer.put(0.toByte())
+      buffer.putInt(start, buffer.position() - start - 4)
+//      buffer.put(start + 3, 1.toByte())
+    }
+  }
+
 
   class OKPacket(private val info: String): FromServer, Packet() {
     override fun toString() = "OK(){\n${info}}"
@@ -24,9 +48,9 @@ sealed class Packet {
     override fun toString() = "EOF()"
   }
 
-  class HandshakePacket(private val capabilities: BitSet,
-                        private val scramble: ByteArray,
-                        private val auth: String?): FromServer, Packet() {
+  class HandshakePacket(internal val connectionId: Int,
+                        internal val scramble: ByteArray,
+                        internal val auth: String?): FromServer, Packet() {
     override fun toString() = "HANDSHAKE(auth: ${auth ?: "null"})"
   }
 
@@ -42,11 +66,11 @@ sealed class Packet {
       val start = buffer.position()
       val first = buffer.get()
       when (first) {
-        0x00.toByte() -> {
-          val affectedRows = getLengthEncodedInteger(buffer)
-          val lastInsertId = getLengthEncodedInteger(buffer)
-          val status = BitSet.valueOf(ByteArray(2).apply { buffer.get(this) })
-          val warningCount = buffer.getShort()
+        0x00.toByte(), 0xfe.toByte() -> {
+          /*val affectedRows =*/ getLengthEncodedInteger(buffer)
+          /*val lastInsertId =*/ getLengthEncodedInteger(buffer)
+          /*val status =*/ ByteArray(2).apply { buffer.get(this) }
+          /*val warningCount =*/ buffer.getShort()
           val info = ByteArray(start + length - buffer.position()).let {
             buffer.get(it)
             String(it)
@@ -55,7 +79,7 @@ sealed class Packet {
         }
         0xff.toByte() -> {
           val errorCode = buffer.getShort()
-          buffer.get() // marker
+          /*val marker =*/ buffer.get()
           val sqlState = ByteArray(5).let {
             buffer.get(it)
             String(it)
@@ -66,32 +90,35 @@ sealed class Packet {
           }
           return ErrPacket(errorCode, sqlState, message)
         }
-        0xfe.toByte() -> {
-          val warningCount = buffer.getShort()
-          val status = BitSet.valueOf(ByteArray(2).apply { buffer.get(this) })
-          assert(start + length == buffer.position())
-          return EOFPacket()
-        }
+// CLIENT_DEPRECATE_EOF is set -> EOF is replaced with OK
+//        0xfe.toByte() -> {
+//          val warningCount = buffer.getShort()
+//          val status = BitSet.valueOf(ByteArray(2).apply { buffer.get(this) })
+//          assert(start + length == buffer.position())
+//          return EOFPacket()
+//        }
         0x0a.toByte() -> {
-          val serverVersion = getNullTerminatedString(buffer)
+          /*val serverVersion =*/ getNullTerminatedString(buffer)
           val connectionId = buffer.getInt()
           var scramble = ByteArray(8).apply { buffer.get(this) }
           val filler1 = buffer.get()
           assert(filler1 == 0.toByte())
           val capabilitiesBytes = ByteArray(4).apply { buffer.get(this, 2, 2) }
           if (start + length > buffer.position()) {
-            val collation = buffer.get()
-            val status = BitSet.valueOf(ByteArray(2).apply { buffer.get(this) })
+            /*val collation =*/ buffer.get()
+            /*val status =*/ ByteArray(2).apply { buffer.get(this) }
             buffer.get(capabilitiesBytes, 0, 2)
-            val n = Math.max(13, buffer.get() - 8)
+            val n = Math.max(12, buffer.get() - 9)
             buffer.get(ByteArray(10))
             scramble = ByteArray(scramble.size + n).apply {
               System.arraycopy(scramble, 0, this, 0, scramble.size)
               buffer.get(this, scramble.size, n)
             }
+            /*val filler2 =*/ buffer.get()
+            //assert(filler2 == 0.toByte())
           }
           val auth = getNullTerminatedString(buffer, start + length)
-          return HandshakePacket(BitSet.valueOf(capabilitiesBytes), scramble, auth)
+          return HandshakePacket(connectionId, scramble, auth)
         }
         else -> throw IllegalArgumentException(first.toString(16))
       }

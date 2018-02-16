@@ -3,33 +3,43 @@ package info.jdavid.mysql
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.SocketAddress
+import java.security.MessageDigest
 
 object Authentication {
 
-//  internal suspend fun authenticate(connection: Connection,
-//                                    credentials: Credentials): List<Message.FromServer> {
-//    val messages = connection.receive()
-//    val authenticationMessage = messages.find { it is Message.Authentication } ?:
-//                                throw RuntimeException("Expected authentication message.")
-//    when (authenticationMessage) {
-//      is Message.AuthenticationOk -> return messages
-//      is Message.AuthenticationCleartextPassword -> {
-//        if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
-//        connection.send(
-//          Message.PasswordMessage(credentials.username, credentials.password, authenticationMessage)
-//        )
-//        return authenticate(connection, credentials)
-//      }
-//      is Message.AuthenticationMD5Password -> {
-//        if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
-//        connection.send(
-//          Message.PasswordMessage(credentials.username, credentials.password, authenticationMessage)
-//        )
-//        return authenticate(connection, credentials)
-//      }
-//      else -> throw Exception("Unsupported authentication method.")
-//    }
-//  }
+  internal suspend fun authenticate(connection: Connection,
+                                    database: String,
+                                    credentials: Credentials): List<Packet.FromServer> {
+    val messages = connection.receive()
+    if (messages.find { it is Packet.OKPacket } != null) return messages
+    val handshake = messages.find { it is Packet.HandshakePacket } as? Packet.HandshakePacket ?:
+                                throw RuntimeException("Expected handshake package.")
+    when (handshake.auth) {
+      null -> throw RuntimeException("Unsupported authentication method: null")
+      "mysql_old_password", "mysql_clear_password", "dialog" -> throw Exception(
+        "Unsupported authentication method: ${handshake.auth}"
+      )
+      "auth_gssapi_client" -> throw Exception("Incompatible credentials.")
+      "mysql_native_password" -> {
+        if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
+        val authResponse = nativePassword(credentials.password, handshake.scramble)
+        connection.send(Packet.HandshakeResponse(database, credentials.username, authResponse, handshake))
+        return authenticate(connection, database, credentials)
+      }
+      else -> throw Exception("Unsupported authentication method: ${handshake.auth}")
+    }
+  }
+
+  private fun nativePassword(password: String, salt: ByteArray): ByteArray {
+    val sha1 = MessageDigest.getInstance("SHA1")
+    val s = sha1.digest(password.toByteArray())
+    val ss = sha1.digest(s)
+    sha1.update(salt)
+    val xor = sha1.digest(ss)
+    return ByteArray(s.size, { i ->
+      (s[i].toInt() xor xor[i].toInt()).toByte()
+    })
+  }
 
   class Exception(message: String): RuntimeException(message)
 
