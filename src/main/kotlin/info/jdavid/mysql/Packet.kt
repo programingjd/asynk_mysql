@@ -1,6 +1,7 @@
 package info.jdavid.mysql
 
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 sealed class Packet {
 
@@ -18,7 +19,7 @@ sealed class Packet {
       buffer.putInt(0)
       buffer.putInt(Capabilities.clientCapabilities())
       buffer.putInt(4092)
-      buffer.put(33.toByte()) // utf8_general_ci
+      buffer.put(Collations.UTF8)
       buffer.put(ByteArray(23))
       buffer.put(username.toByteArray())
       buffer.put(0.toByte())
@@ -58,7 +59,9 @@ sealed class Packet {
 
     @Suppress("UsePropertyAccessSyntax")
     internal fun fromBytes(buffer: ByteBuffer): Packet.FromServer {
-      val length = buffer.getInt()
+      val length = buffer.getShort()
+      assert(buffer.get() == 0.toByte())
+      val sequenceId = buffer.get()
 //      val length = threeByteInteger(buffer)
 //      val sequenceId = buffer.get()
 //      assert(sequenceId == 0.toByte())
@@ -79,7 +82,6 @@ sealed class Packet {
         }
         0xff.toByte() -> {
           val errorCode = buffer.getShort()
-          /*val marker =*/ buffer.get()
           val sqlState = ByteArray(5).let {
             buffer.get(it)
             String(it)

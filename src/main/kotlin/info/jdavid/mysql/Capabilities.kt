@@ -20,9 +20,9 @@ internal object Capabilities {
 
   val CLIENT_DEPRECATE_EOF = 1 shl 24
 
-  fun clientCapabilities() = CLIENT_MYSQL +
+  fun clientCapabilities() = //CLIENT_MYSQL +
                              CONNECT_WITH_DB +
-                             IGNORE_SPACE +
+                             //IGNORE_SPACE +
                              CLIENT_PROTOCOL_41 +
                              TRANSACTIONS +
                              SECURE_CONNECTION +
