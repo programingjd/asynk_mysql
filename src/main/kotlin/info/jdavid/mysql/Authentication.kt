@@ -11,7 +11,8 @@ object Authentication {
                                     database: String,
                                     credentials: Credentials): List<Packet.FromServer> {
     val messages = connection.receive()
-    if (messages.find { it is Packet.OKPacket } != null) return messages
+    if (messages.find { it is Packet.ErrPacket } != null) throw RuntimeException("Authentication failed.")
+    if (messages.find { it is Packet.OKPacket && it.sequenceId == 2.toByte() } != null) return messages
     val handshake = messages.find { it is Packet.HandshakePacket } as? Packet.HandshakePacket ?:
                                 throw RuntimeException("Expected handshake package.")
     when (handshake.auth) {

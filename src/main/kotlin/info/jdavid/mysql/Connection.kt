@@ -21,7 +21,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
 
   internal suspend fun send(packet: Packet.FromClient) {
     packet.writeTo(buffer.clear() as ByteBuffer)
-    warn("send: " + hex((buffer.duplicate().flip() as ByteBuffer).let { ByteArray(it.remaining()).apply { it.get(this) } }))
+    //warn("send: " + hex((buffer.duplicate().flip() as ByteBuffer).let { ByteArray(it.remaining()).apply { it.get(this) } }))
     channel.aWrite(buffer.flip() as ByteBuffer, 5000L, TimeUnit.MILLISECONDS)
   }
 
@@ -29,7 +29,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     buffer.clear()
     val n = channel.aRead(buffer, 5000L, TimeUnit.MILLISECONDS)
     if (n == buffer.capacity()) throw RuntimeException("Connection buffer too small.")
-    warn("receive: " + hex((buffer.duplicate().flip() as ByteBuffer).let { ByteArray(it.remaining()).apply { it.get(this) } }))
+    //warn("receive: " + hex((buffer.duplicate().flip() as ByteBuffer).let { ByteArray(it.remaining()).apply { it.get(this) } }))
     buffer.flip()
     val list = LinkedList<Packet.FromServer>()
     while(buffer.remaining() > 0) {

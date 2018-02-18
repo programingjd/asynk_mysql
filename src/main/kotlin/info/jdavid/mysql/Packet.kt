@@ -34,7 +34,7 @@ sealed class Packet {
   }
 
 
-  class OKPacket(private val info: String): FromServer, Packet() {
+  class OKPacket(internal val sequenceId: Byte, private val info: String): FromServer, Packet() {
     override fun toString() = "OK(){\n${info}\n}"
   }
 
@@ -58,12 +58,8 @@ sealed class Packet {
 
     @Suppress("UsePropertyAccessSyntax")
     internal fun fromBytes(buffer: ByteBuffer): Packet.FromServer {
-      val length = buffer.getShort()
-      assert(buffer.get() == 0.toByte())
+      val length = threeByteInteger(buffer)
       val sequenceId = buffer.get()
-//      val length = threeByteInteger(buffer)
-//      val sequenceId = buffer.get()
-//      assert(sequenceId == 0.toByte())
       if (length > buffer.remaining()) throw RuntimeException("Connection buffer too small.")
       val start = buffer.position()
       val first = buffer.get()
@@ -77,7 +73,7 @@ sealed class Packet {
             buffer.get(it)
             String(it)
           }
-          return OKPacket(info)
+          return OKPacket(sequenceId, info)
         }
         0xff.toByte() -> {
           val errorCode = buffer.getShort()
@@ -125,13 +121,14 @@ sealed class Packet {
       }
     }
 
-    private fun threeByteInteger(buffer: ByteBuffer): Int {
-      return buffer.get().toInt() and 0xff +
-        buffer.get().toInt() and 0xff shl  8 +
-        buffer.get().toInt() and 0xff shl 16
+    internal fun threeByteInteger(buffer: ByteBuffer): Int {
+      val one = buffer.get().toInt() and 0xff
+      val two = buffer.get().toInt() and 0xff
+      val three = buffer.get().toInt() and 0xff
+      return one + two * 256 + three * 256 * 256
     }
 
-    private fun getLengthEncodedInteger(buffer: ByteBuffer): Long {
+    internal fun getLengthEncodedInteger(buffer: ByteBuffer): Long {
       val first = buffer.get()
       @Suppress("UsePropertyAccessSyntax")
       return when (first) {
