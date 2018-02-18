@@ -13,7 +13,13 @@ fun main(args: Array<String>) {
   runBlocking {
     Authentication.Credentials.PasswordCredentials(username, password).
       connectTo(database).use {
-
+        val preparedStatement = it.prepare("""
+            CREATE TEMPORARY TABLE test(
+              id INT NOT NULL AUTO_INCREMENT,
+              name VARCHAR(255) NOT NULL,
+              PRIMARY KEY (id)
+            )
+          """.trimIndent())
     }
   }
 }

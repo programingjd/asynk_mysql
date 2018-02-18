@@ -9,12 +9,8 @@ object Authentication {
 
   internal suspend fun authenticate(connection: Connection,
                                     database: String,
-                                    credentials: Credentials): List<Packet.FromServer> {
-    val messages = connection.receive()
-    if (messages.find { it is Packet.ErrPacket } != null) throw RuntimeException("Authentication failed.")
-    if (messages.find { it is Packet.OKPacket && it.sequenceId == 2.toByte() } != null) return messages
-    val handshake = messages.find { it is Packet.HandshakePacket } as? Packet.HandshakePacket ?:
-                                throw RuntimeException("Expected handshake package.")
+                                    credentials: Credentials) {
+    val handshake = connection.receive(Packet.Handshake::class.java)
     when (handshake.auth) {
       null -> throw RuntimeException("Unsupported authentication method: null")
       "mysql_old_password", "mysql_clear_password", "dialog" -> throw Exception(
@@ -25,7 +21,8 @@ object Authentication {
         if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
         val authResponse = nativePassword(credentials.password, handshake.scramble)
         connection.send(Packet.HandshakeResponse(database, credentials.username, authResponse, handshake))
-        return authenticate(connection, database, credentials)
+        val ok = connection.receive(Packet.OK::class.java)
+        assert (ok.sequenceId == 2.toByte())
       }
       else -> throw Exception("Unsupported authentication method: ${handshake.auth}")
     }

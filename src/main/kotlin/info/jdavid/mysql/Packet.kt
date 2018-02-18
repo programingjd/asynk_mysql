@@ -11,7 +11,7 @@ sealed class Packet {
 
   class HandshakeResponse(private val database: String,
                           private val username: String, private val authResponse: ByteArray,
-                          private val handshake: HandshakePacket): FromClient, Packet() {
+                          private val handshake: Handshake): FromClient, Packet() {
 
     override fun writeTo(buffer: ByteBuffer) {
       val start = buffer.position()
@@ -33,38 +33,72 @@ sealed class Packet {
     }
   }
 
-
-  class OKPacket(internal val sequenceId: Byte, private val info: String): FromServer, Packet() {
-    override fun toString() = "OK(){\n${info}\n}"
+  class StatementPrepare(private val query: String): FromClient, Packet() {
+    override fun toString() = "StatementPrepare(): ${query}"
+    override fun writeTo(buffer: ByteBuffer) {
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put(22.toByte())
+      buffer.put(query.toByteArray())
+      buffer.putInt(start, buffer.position() - start - 4)
+    }
   }
 
-  class ErrPacket(private val errorCode: Short,
-                  private val sqlState: String,
-                  private val message: String): FromServer, Packet() {
-    override fun toString() = "ERR(code: ${errorCode}, state: ${sqlState}){\n${message}\n}"
+
+  //-----------------------------------------------------------------------------------------------
+
+
+  class OK(internal val sequenceId: Byte, private val info: String): FromServer, Packet() {
+    override fun toString() = "GenericOK(){\n${info}\n}"
   }
 
-  class EOFPacket: FromServer, Packet() {
+  class StatementPrepareOK(internal val sequenceId: Byte,
+                           internal val statementId: Int,
+                           internal val columnCount: Short,
+                           internal val paramCount: Short): FromServer, Packet() {
+    override fun toString() = "StatementPrepareOK(${statementId})"
+  }
+
+  class ColumnDefinition(private val name: String, private val table: String): FromServer, Packet() {
+    override fun toString() = "ColumnDefinition(${table}.${name})"
+  }
+
+  class EOF : FromServer, Packet() {
     override fun toString() = "EOF()"
   }
 
-  class HandshakePacket(internal val connectionId: Int,
-                        internal val scramble: ByteArray,
-                        internal val auth: String?): FromServer, Packet() {
+  class Handshake(internal val connectionId: Int,
+                  internal val scramble: ByteArray,
+                  internal val auth: String?): FromServer, Packet() {
     override fun toString() = "HANDSHAKE(auth: ${auth ?: "null"})"
   }
 
   companion object {
 
-    @Suppress("UsePropertyAccessSyntax")
-    internal fun fromBytes(buffer: ByteBuffer): Packet.FromServer {
+    @Suppress("UsePropertyAccessSyntax", "UNCHECKED_CAST")
+    internal fun <T: FromServer> fromBytes(buffer: ByteBuffer, expected: Class<T>?): T {
       val length = threeByteInteger(buffer)
       val sequenceId = buffer.get()
       if (length > buffer.remaining()) throw RuntimeException("Connection buffer too small.")
       val start = buffer.position()
       val first = buffer.get()
-      when (first) {
-        0x00.toByte(), 0xfe.toByte() -> {
+      if (first == 0xff.toByte()) {
+        val errorCode = buffer.getShort()
+        val sqlState = ByteArray(5).let {
+          buffer.get(it)
+          String(it)
+        }
+        val message = ByteArray(start + length - buffer.position()).let {
+          buffer.get(it)
+          String(it)
+        }
+        assert(start + length == buffer.position())
+        throw Exception("Error code: ${errorCode}, SQLState: ${sqlState}\n${message}")
+      }
+      return when (expected) {
+        OK::class.java -> {
+          println("OK")
+          assert(first == 0x00.toByte() || first == 0xfe.toByte())
           /*val affectedRows =*/ getLengthEncodedInteger(buffer)
           /*val lastInsertId =*/ getLengthEncodedInteger(buffer)
           /*val status =*/ ByteArray(2).apply { buffer.get(this) }
@@ -73,28 +107,51 @@ sealed class Packet {
             buffer.get(it)
             String(it)
           }
-          return OKPacket(sequenceId, info)
+          assert(start + length == buffer.position())
+          OK(sequenceId, info) as T
         }
-        0xff.toByte() -> {
-          val errorCode = buffer.getShort()
-          val sqlState = ByteArray(5).let {
-            buffer.get(it)
-            String(it)
-          }
-          val message = ByteArray(start + length - buffer.position()).let {
-            buffer.get(it)
-            String(it)
-          }
-          return ErrPacket(errorCode, sqlState, message)
+        EOF::class.java -> {
+          println("EOF")
+          assert(first == 0xfe.toByte())
+          // CLIENT_DEPRECATE_EOF is set -> EOF is replaced with OK
+          /* val warningCount =*/ buffer.getShort()
+          /*val status =*/ ByteArray(2).apply { buffer.get(this) }
+          assert(start + length == buffer.position())
+          return EOF() as T
         }
-// CLIENT_DEPRECATE_EOF is set -> EOF is replaced with OK
-//        0xfe.toByte() -> {
-//          val warningCount = buffer.getShort()
-//          val status = BitSet.valueOf(ByteArray(2).apply { buffer.get(this) })
-//          assert(start + length == buffer.position())
-//          return EOFPacket()
-//        }
-        0x0a.toByte() -> {
+        StatementPrepareOK::class.java -> {
+          println("STMT_PREPARE_OK")
+          assert(first == 0x00.toByte())
+          val statementId = buffer.getInt()
+          val columnCount = buffer.getShort()
+          val paramCount = buffer.getShort()
+          /*val filler =*/ buffer.get()
+          /*val warningCount =*/ buffer.getShort()
+          assert(start + length == buffer.position())
+          StatementPrepareOK(sequenceId, statementId, columnCount, paramCount) as T
+        }
+        ColumnDefinition::class.java -> {
+          println("COLUMN_DEFINITION")
+          assert(first == 0x00.toByte())
+          val catalog = getLengthEncodedString(buffer)
+          val schema = getLengthEncodedString(buffer)
+          val table = getLengthEncodedString(buffer)
+          val tableOrg = getLengthEncodedString(buffer)
+          val name = getLengthEncodedString(buffer)
+          val nameOrg = getLengthEncodedString(buffer)
+          val n = getLengthEncodedInteger(buffer)
+          val collation = buffer.getShort()
+          val columnLength = buffer.getInt()
+          val type = buffer.get()
+          val flags = ByteArray(2).apply { buffer.get(this) }
+          val maxDigits = buffer.get()
+          val filler = ByteArray(2).apply { buffer.get(this) }
+          assert(start + length == buffer.position())
+          return ColumnDefinition(name, table) as T
+        }
+        Handshake::class.java -> {
+          println("HANDSHAKE")
+          assert(first == 0x0a.toByte())
           /*val serverVersion =*/ getNullTerminatedString(buffer)
           val connectionId = buffer.getInt()
           var scramble = ByteArray(8).apply { buffer.get(this) }
@@ -115,9 +172,10 @@ sealed class Packet {
             //assert(filler2 == 0.toByte())
           }
           val auth = getNullTerminatedString(buffer, start + length)
-          return HandshakePacket(connectionId, scramble, auth)
+          assert(start + length == buffer.position())
+          return Handshake(connectionId, scramble, auth) as T
         }
-        else -> throw IllegalArgumentException(first.toString(16))
+        else -> throw IllegalArgumentException()
       }
     }
 
@@ -169,5 +227,7 @@ sealed class Packet {
     }
 
   }
+
+  class Exception(message: String): RuntimeException(message)
 
 }

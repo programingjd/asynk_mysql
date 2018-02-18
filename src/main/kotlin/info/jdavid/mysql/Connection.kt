@@ -13,7 +13,6 @@ import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.AsynchronousSocketChannel
-import java.util.LinkedList
 import java.util.concurrent.TimeUnit
 
 class Connection internal constructor(private val channel: AsynchronousSocketChannel,
@@ -23,7 +22,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   override fun close() = channel.close()
 
   suspend fun affectedRows(sqlStatement: String, params: Iterable<Any?> = emptyList()): Int {
-    val statement = prepare(sqlStatement, null)
+    val statement = prepare(sqlStatement, true)
     return affectedRows(statement, params)
   }
 
@@ -34,7 +33,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
 
   suspend fun rows(sqlStatement: String,
                    params: Iterable<Any?> = emptyList()): ResultSet {
-    val statement = prepare(sqlStatement, null)
+    val statement = prepare(sqlStatement, true)
     return rows(statement, params)
   }
 
@@ -47,41 +46,36 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     TODO()
   }
 
-  suspend fun prepare(sqlStatement: String, name: String = "__ps_${++statementCounter}"): PreparedStatement {
-    return prepare(sqlStatement, name)
+  suspend fun prepare(sqlStatement: String): PreparedStatement {
+    return prepare(sqlStatement, false)
   }
 
-  private suspend fun prepare(sqlStatement: String, name: ByteArray?): PreparedStatement {
-    TODO()
+  private suspend fun prepare(sqlStatement: String, temporary: Boolean): PreparedStatement {
+    send(Packet.StatementPrepare(sqlStatement))
+    val prepareOK = receive(Packet.StatementPrepareOK::class.java)
+    for (i in 1..prepareOK.columnCount) receive(Packet.ColumnDefinition::class.java)
+    for (i in 1..prepareOK.paramCount) receive(Packet.ColumnDefinition::class.java)
+    return PreparedStatement(prepareOK.statementId)
   }
 
   internal suspend fun send(packet: Packet.FromClient) {
+    assert(buffer.limit() == buffer.position())
     packet.writeTo(buffer.clear() as ByteBuffer)
-    //warn("send: " + hex((buffer.duplicate().flip() as ByteBuffer).let { ByteArray(it.remaining()).apply { it.get(this) } }))
     channel.aWrite(buffer.flip() as ByteBuffer, 5000L, TimeUnit.MILLISECONDS)
+    buffer.clear().flip()
   }
 
-  internal suspend fun receive(): List<Packet.FromServer> {
-    buffer.clear()
+  internal suspend fun <T: Packet.FromServer> receive(type: Class<T>): T {
+    if (buffer.remaining() > 0) return Packet.fromBytes(buffer, type)
+    buffer.compact()
+    val left = buffer.capacity() - buffer.position()
     val n = channel.aRead(buffer, 5000L, TimeUnit.MILLISECONDS)
-    if (n == buffer.capacity()) throw RuntimeException("Connection buffer too small.")
-    //warn("receive: " + hex((buffer.duplicate().flip() as ByteBuffer).let { ByteArray(it.remaining()).apply { it.get(this) } }))
+    if (n == left) throw RuntimeException("Connection buffer too small.")
     buffer.flip()
-    val list = LinkedList<Packet.FromServer>()
-    while(buffer.remaining() > 0) {
-      val packet = Packet.fromBytes(buffer)
-      list.add(packet)
-    }
-    list.forEach {
-      when (it) {
-        is Packet.ErrPacket -> err(it.toString())
-      }
-    }
-    return list
+    return Packet.fromBytes(buffer, type)
   }
 
-  inner class PreparedStatement internal constructor(internal val name: String?,
-                                                     internal val query: String) {
+  inner class PreparedStatement internal constructor(internal val id: Int) {
     suspend fun rows(params: Iterable<Any?> = emptyList()) = this@Connection.rows(this, params)
     suspend fun affectedRows(params: Iterable<Any?> = emptyList()) = this@Connection.affectedRows(this, params)
     suspend fun close() = this@Connection.close(this)
@@ -103,7 +97,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       try {
         channel.aConnect(address)
         val buffer = ByteBuffer.allocateDirect(4194304)// needs to hold any RowData message
-        buffer.order(ByteOrder.LITTLE_ENDIAN)
+        buffer.order(ByteOrder.LITTLE_ENDIAN).flip()
         val connection = Connection(channel, buffer)
         Authentication.authenticate(connection, database, credentials)
         return connection
