@@ -1,7 +1,6 @@
 package info.jdavid.mysql
 
 import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 sealed class Packet {
 
@@ -30,19 +29,19 @@ sealed class Packet {
       buffer.put(handshake.auth?.toByteArray())
       buffer.put(0.toByte())
       buffer.putInt(start, buffer.position() - start - 4)
-//      buffer.put(start + 3, 1.toByte())
+      buffer.put(start + 3, 1.toByte())
     }
   }
 
 
   class OKPacket(private val info: String): FromServer, Packet() {
-    override fun toString() = "OK(){\n${info}}"
+    override fun toString() = "OK(){\n${info}\n}"
   }
 
   class ErrPacket(private val errorCode: Short,
                   private val sqlState: String,
                   private val message: String): FromServer, Packet() {
-    override fun toString() = "ERR(code: ${errorCode}, state: ${sqlState}){\n${message}}"
+    override fun toString() = "ERR(code: ${errorCode}, state: ${sqlState}){\n${message}\n}"
   }
 
   class EOFPacket: FromServer, Packet() {
