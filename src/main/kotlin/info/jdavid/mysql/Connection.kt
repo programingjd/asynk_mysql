@@ -1,5 +1,7 @@
 package info.jdavid.mysql
 
+import kotlinx.coroutines.experimental.channels.Channel
+import kotlinx.coroutines.experimental.channels.toList
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
@@ -16,8 +18,42 @@ import java.util.concurrent.TimeUnit
 
 class Connection internal constructor(private val channel: AsynchronousSocketChannel,
                                       private val buffer: ByteBuffer): Closeable {
+  private var statementCounter = 0
 
   override fun close() = channel.close()
+
+  suspend fun affectedRows(sqlStatement: String, params: Iterable<Any?> = emptyList()): Int {
+    val statement = prepare(sqlStatement, null)
+    return affectedRows(statement, params)
+  }
+
+  suspend fun affectedRows(preparedStatement: PreparedStatement,
+                           params: Iterable<Any?> = emptyList()): Int {
+    TODO()
+  }
+
+  suspend fun rows(sqlStatement: String,
+                   params: Iterable<Any?> = emptyList()): ResultSet {
+    val statement = prepare(sqlStatement, null)
+    return rows(statement, params)
+  }
+
+  suspend fun rows(preparedStatement: PreparedStatement,
+                   params: Iterable<Any?> = emptyList()): ResultSet {
+    TODO()
+  }
+
+  suspend fun close(preparedStatement: PreparedStatement) {
+    TODO()
+  }
+
+  suspend fun prepare(sqlStatement: String, name: String = "__ps_${++statementCounter}"): PreparedStatement {
+    return prepare(sqlStatement, name)
+  }
+
+  private suspend fun prepare(sqlStatement: String, name: ByteArray?): PreparedStatement {
+    TODO()
+  }
 
   internal suspend fun send(packet: Packet.FromClient) {
     packet.writeTo(buffer.clear() as ByteBuffer)
@@ -42,6 +78,19 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       }
     }
     return list
+  }
+
+  inner class PreparedStatement internal constructor(internal val name: String?,
+                                                     internal val query: String) {
+    suspend fun rows(params: Iterable<Any?> = emptyList()) = this@Connection.rows(this, params)
+    suspend fun affectedRows(params: Iterable<Any?> = emptyList()) = this@Connection.affectedRows(this, params)
+    suspend fun close() = this@Connection.close(this)
+  }
+
+  class ResultSet(private val channel: Channel<Map<String, Any?>>): Closeable {
+    operator fun iterator() = channel.iterator()
+    override fun close() { channel.cancel() }
+    suspend fun toList() = channel.toList()
   }
 
   companion object {
