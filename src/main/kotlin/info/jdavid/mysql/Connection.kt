@@ -54,8 +54,8 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       while (true) {
         val row = receive(Packet.Row::class.java)
         if (row.bytes == null) break
-        channel.send(row.decode(cols))
         println(row)
+        channel.send(row.decode(cols))
       }
       if (preparedStatement.temporary) {
         send(Packet.StatementReset(preparedStatement.id))

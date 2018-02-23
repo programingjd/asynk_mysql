@@ -1,7 +1,7 @@
 package info.jdavid.mysql
 
 import java.nio.ByteBuffer
-import java.util.BitSet
+import java.nio.ByteOrder
 
 sealed class Packet {
 
@@ -76,9 +76,9 @@ sealed class Packet {
       buffer.put(0x17.toByte())
       buffer.putInt(statementId)
       buffer.putInt(0) //
-      val bitmap = BitSet(list.size)
-      list.forEachIndexed { index, any -> if (list[index] == null) bitmap.set(index) }
-      buffer.put(bitmap.toByteArray())
+      val bitmap = Bitmap(list.size)
+      list.forEachIndexed { index, any -> if (list[index] == null) bitmap.set(index, true) }
+      buffer.put(bitmap.bytes)
       buffer.put(0)
       buffer.putInt(start, buffer.position() - start - 4)
     }
@@ -99,7 +99,8 @@ sealed class Packet {
     override fun toString() = "StatementPrepareOK(${statementId})"
   }
 
-  class ColumnDefinition(private val name: String, private val table: String): FromServer, Packet() {
+  class ColumnDefinition(internal val name: String, internal val table: String,
+                         internal val type: Byte, internal val unsigned: Boolean): FromServer, Packet() {
     override fun toString() = "ColumnDefinition(${table}.${name})"
   }
 
@@ -117,7 +118,21 @@ sealed class Packet {
       }
     }
     internal fun decode(cols: List<ColumnDefinition>): Map<String,Any?> {
-      return emptyMap()
+      val n = cols.size
+      if (n == 0) return emptyMap()
+      val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+      val bitmap =  Bitmap(n).set(buffer)
+      val map = LinkedHashMap<String,Any?>(n)
+      for (i in 0 until n) {
+        val col = cols[i]
+        if (bitmap.get(i)) {
+          map[col.name] = null
+        }
+        else {
+          map[col.name] = BinaryFormat.parse(col.type, col.unsigned, buffer)
+        }
+      }
+      return map
     }
   }
 
@@ -135,7 +150,7 @@ sealed class Packet {
 
     @Suppress("UsePropertyAccessSyntax", "UNCHECKED_CAST")
     internal fun <T: FromServer> fromBytes(buffer: ByteBuffer, expected: Class<T>?): T {
-      val length = threeByteInteger(buffer)
+      val length = BinaryFormat.threeByteInteger(buffer)
       val sequenceId = buffer.get()
       if (length > buffer.remaining()) throw RuntimeException("Connection buffer too small.")
       val start = buffer.position()
@@ -157,8 +172,8 @@ sealed class Packet {
         OK::class.java -> {
           println("OK")
           assert(first == 0x00.toByte() || first == 0xfe.toByte())
-          /*val affectedRows =*/ getLengthEncodedInteger(buffer)
-          /*val lastInsertId =*/ getLengthEncodedInteger(buffer)
+          /*val affectedRows =*/ BinaryFormat.getLengthEncodedInteger(buffer)
+          /*val lastInsertId =*/ BinaryFormat.getLengthEncodedInteger(buffer)
           /*val status =*/ ByteArray(2).apply { buffer.get(this) }
           /*val warningCount =*/ buffer.getShort()
           val info = ByteArray(start + length - buffer.position()).let {
@@ -192,20 +207,21 @@ sealed class Packet {
           println("COLUMN_DEFINITION")
           assert(first == 3.toByte())
           ByteArray(first.toInt()).apply { buffer.get(this) }//.apply { assert(String(this) == "def") }
-          val schema = getLengthEncodedString(buffer)
-          val table = getLengthEncodedString(buffer)
-          val tableOrg = getLengthEncodedString(buffer)
-          val name = getLengthEncodedString(buffer)
-          val nameOrg = getLengthEncodedString(buffer)
-          val n = getLengthEncodedInteger(buffer)
-          val collation = buffer.getShort()
-          val columnLength = buffer.getInt()
-          val type = buffer.get()
-          val flags = ByteArray(2).apply { buffer.get(this) }
-          val maxDigits = buffer.get()
-          val filler = ByteArray(2).apply { buffer.get(this) }
+          /*val schema =*/ BinaryFormat.getLengthEncodedString(buffer)
+          val table = BinaryFormat.getLengthEncodedString(buffer)
+          /*val tableOrg =*/ BinaryFormat.getLengthEncodedString(buffer)
+          val name = BinaryFormat.getLengthEncodedString(buffer)
+          /*val nameOrg =*/ BinaryFormat.getLengthEncodedString(buffer)
+          /*val n =*/ BinaryFormat.getLengthEncodedInteger(buffer)
+          /*val collation =*/ buffer.getShort()
+          /*val columnLength =*/ buffer.getInt()
+          val columnType = buffer.get()
+          val flags = Bitmap(16).set(buffer)
+          val unsigned = flags.get(5)
+          /*val maxDigits =*/ buffer.get()
+          /*val filler =*/ ByteArray(2).apply { buffer.get(this) }
           assert(start + length == buffer.position())
-          return ColumnDefinition(name, table) as T
+          return ColumnDefinition(name, table, columnType, unsigned) as T
         }
         BinaryResultSet::class.java -> {
           println("RESULTSET")
@@ -215,8 +231,8 @@ sealed class Packet {
         Row::class.java -> {
           println("ROW")
           if (first == 0xfe.toByte()) {
-            /*val affectedRows =*/ getLengthEncodedInteger(buffer)
-            /*val lastInsertId =*/ getLengthEncodedInteger(buffer)
+            /*val affectedRows =*/ BinaryFormat.getLengthEncodedInteger(buffer)
+            /*val lastInsertId =*/ BinaryFormat.getLengthEncodedInteger(buffer)
             /*val status =*/ ByteArray(2).apply { buffer.get(this) }
             /*val warningCount =*/ buffer.getShort()
             val info = ByteArray(start + length - buffer.position()).let {
@@ -235,7 +251,7 @@ sealed class Packet {
         Handshake::class.java -> {
           println("HANDSHAKE")
           assert(first == 0x0a.toByte())
-          /*val serverVersion =*/ getNullTerminatedString(buffer)
+          /*val serverVersion =*/ BinaryFormat.getNullTerminatedString(buffer)
           val connectionId = buffer.getInt()
           var scramble = ByteArray(8).apply { buffer.get(this) }
           val filler1 = buffer.get()
@@ -254,59 +270,12 @@ sealed class Packet {
             /*val filler2 =*/ buffer.get()
             //assert(filler2 == 0.toByte())
           }
-          val auth = getNullTerminatedString(buffer, start + length)
+          val auth = BinaryFormat.getNullTerminatedString(buffer, start + length)
           assert(start + length == buffer.position())
           return Handshake(connectionId, scramble, auth) as T
         }
         else -> throw IllegalArgumentException()
       }
-    }
-
-    internal fun threeByteInteger(buffer: ByteBuffer): Int {
-      val one = buffer.get().toInt() and 0xff
-      val two = buffer.get().toInt() and 0xff
-      val three = buffer.get().toInt() and 0xff
-      return one + two * 256 + three * 256 * 256
-    }
-
-    internal fun getLengthEncodedInteger(buffer: ByteBuffer): Long {
-      val first = buffer.get()
-      @Suppress("UsePropertyAccessSyntax")
-      return when (first) {
-        0xff.toByte() -> throw RuntimeException()
-        0xfe.toByte() -> buffer.getLong()
-        0xfd.toByte() -> threeByteInteger(buffer).toLong()
-        0xfc.toByte() -> buffer.getInt().toLong()
-        else -> first.toLong()
-      }
-    }
-
-    private fun getLengthEncodedString(buffer: ByteBuffer): String {
-      val length = getLengthEncodedInteger(buffer).toInt()
-      return ByteArray(length).let {
-        buffer.get(it)
-        String(it)
-      }
-    }
-
-    private fun getNullTerminatedString(buffer: ByteBuffer): String {
-      val sb = StringBuilder(Math.min(255, buffer.remaining()))
-      while (buffer.remaining() > 0) {
-        val b = buffer.get()
-        if (b == 0.toByte()) break
-        sb.appendCodePoint(b.toInt())
-      }
-      return sb.toString()
-    }
-
-    private fun getNullTerminatedString(buffer: ByteBuffer, end: Int): String {
-      val sb = StringBuilder(Math.min(255, end - buffer.position()))
-      while (buffer.position() < end) {
-        val b = buffer.get()
-        if (b == 0.toByte()) break
-        sb.appendCodePoint(b.toInt())
-      }
-      return sb.toString()
     }
 
   }

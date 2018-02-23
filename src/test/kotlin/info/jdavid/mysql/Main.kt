@@ -16,7 +16,7 @@ fun main(args: Array<String>) {
         val preparedStatement = it.prepare("""
             SELECT * FROM demo WHERE 1
           """.trimIndent())
-        preparedStatement.rows()
+        println(preparedStatement.rows().toList())
     }
   }
 }

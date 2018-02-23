@@ -18,7 +18,7 @@ class ProtocolTypesTests {
       byteArrayOf(0xee.toByte(), 0xcc.toByte(), 0xaa.toByte(), 0)
     ).forEach {
       it.apply {
-        assertEquals(intValue(this), Packet.threeByteInteger(ByteBuffer.wrap(this)))
+        assertEquals(intValue(this), BinaryFormat.threeByteInteger(ByteBuffer.wrap(this)))
       }
     }
   }
