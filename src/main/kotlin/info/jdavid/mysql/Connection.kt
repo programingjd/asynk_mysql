@@ -2,6 +2,7 @@ package info.jdavid.mysql
 
 import kotlinx.coroutines.experimental.channels.Channel
 import kotlinx.coroutines.experimental.channels.toList
+import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
@@ -14,6 +15,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.AsynchronousSocketChannel
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.experimental.EmptyCoroutineContext
 
 class Connection internal constructor(private val channel: AsynchronousSocketChannel,
                                       private val buffer: ByteBuffer): Closeable {
@@ -39,11 +41,33 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
 
   suspend fun rows(preparedStatement: PreparedStatement,
                    params: Iterable<Any?> = emptyList()): ResultSet {
-    TODO()
+    send(Packet.StatementExecute(preparedStatement.id, params))
+    val rs = receive(Packet.BinaryResultSet::class.java)
+    val n = rs.columnCount
+    val cols = ArrayList<Packet.ColumnDefinition>(n)
+    for (i in 0 until n) {
+      cols.add(receive(Packet.ColumnDefinition::class.java))
+    }
+
+    val channel = Channel<Map<String, Any?>>()
+    launch(EmptyCoroutineContext) {
+      while (true) {
+        val row = receive(Packet.Row::class.java)
+        if (row.bytes == null) break
+        channel.send(row.decode(cols))
+        println(row)
+      }
+      if (preparedStatement.temporary) {
+        send(Packet.StatementReset(preparedStatement.id))
+        val ok = receive(Packet.OK::class.java)
+      }
+      channel.close()
+    }
+    return ResultSet(channel)
   }
 
   suspend fun close(preparedStatement: PreparedStatement) {
-    TODO()
+    send(Packet.StatementClose(preparedStatement.id))
   }
 
   suspend fun prepare(sqlStatement: String): PreparedStatement {
@@ -55,7 +79,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     val prepareOK = receive(Packet.StatementPrepareOK::class.java)
     for (i in 1..prepareOK.columnCount) receive(Packet.ColumnDefinition::class.java)
     for (i in 1..prepareOK.paramCount) receive(Packet.ColumnDefinition::class.java)
-    return PreparedStatement(prepareOK.statementId)
+    return PreparedStatement(prepareOK.statementId, temporary)
   }
 
   internal suspend fun send(packet: Packet.FromClient) {
@@ -75,7 +99,8 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     return Packet.fromBytes(buffer, type)
   }
 
-  inner class PreparedStatement internal constructor(internal val id: Int) {
+  inner class PreparedStatement internal constructor(internal val id: Int,
+                                                     internal val temporary: Boolean) {
     suspend fun rows(params: Iterable<Any?> = emptyList()) = this@Connection.rows(this, params)
     suspend fun affectedRows(params: Iterable<Any?> = emptyList()) = this@Connection.affectedRows(this, params)
     suspend fun close() = this@Connection.close(this)

@@ -9,17 +9,14 @@ fun json(any: Any?) = ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT).
 fun main(args: Array<String>) {
   val username = "root"
   val password = "root"
-  val database = "mysql"
+  val database = "test"
   runBlocking {
     Authentication.Credentials.PasswordCredentials(username, password).
       connectTo(database).use {
         val preparedStatement = it.prepare("""
-            CREATE TEMPORARY TABLE test(
-              id INT NOT NULL AUTO_INCREMENT,
-              name VARCHAR(255) NOT NULL,
-              PRIMARY KEY (id)
-            )
+            SELECT * FROM demo WHERE 1
           """.trimIndent())
+        preparedStatement.rows()
     }
   }
 }

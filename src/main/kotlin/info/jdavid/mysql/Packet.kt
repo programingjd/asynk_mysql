@@ -1,6 +1,7 @@
 package info.jdavid.mysql
 
 import java.nio.ByteBuffer
+import java.util.BitSet
 
 sealed class Packet {
 
@@ -38,8 +39,47 @@ sealed class Packet {
     override fun writeTo(buffer: ByteBuffer) {
       val start = buffer.position()
       buffer.putInt(0)
-      buffer.put(22.toByte())
+      buffer.put(0x16.toByte())
       buffer.put(query.toByteArray())
+      buffer.putInt(start, buffer.position() - start - 4)
+    }
+  }
+
+  class StatementClose(private val statementId: Int): FromClient, Packet() {
+    override fun toString() = "StatementClose()"
+    override fun writeTo(buffer: ByteBuffer) {
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put(0x19.toByte())
+      buffer.putInt(statementId)
+      buffer.putInt(start, buffer.position() - start - 4)
+    }
+  }
+
+  class StatementReset(private val statementId: Int): FromClient, Packet() {
+    override fun toString() = "StatementClose()"
+    override fun writeTo(buffer: ByteBuffer) {
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put(0x1a.toByte())
+      buffer.putInt(statementId)
+      buffer.putInt(start, buffer.position() - start - 4)
+    }
+  }
+
+  class StatementExecute(private val statementId: Int, private val params: Iterable<Any?>): FromClient, Packet() {
+    override fun toString() = "StatementClose()"
+    override fun writeTo(buffer: ByteBuffer) {
+      val list = params.toList()
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put(0x17.toByte())
+      buffer.putInt(statementId)
+      buffer.putInt(0) //
+      val bitmap = BitSet(list.size)
+      list.forEachIndexed { index, any -> if (list[index] == null) bitmap.set(index) }
+      buffer.put(bitmap.toByteArray())
+      buffer.put(0)
       buffer.putInt(start, buffer.position() - start - 4)
     }
   }
@@ -61,6 +101,24 @@ sealed class Packet {
 
   class ColumnDefinition(private val name: String, private val table: String): FromServer, Packet() {
     override fun toString() = "ColumnDefinition(${table}.${name})"
+  }
+
+  class BinaryResultSet(internal val columnCount: Int): FromServer, Packet() {
+    override fun toString() = "ResultSet(${columnCount})"
+  }
+
+  class Row(internal val bytes: ByteArray?): FromServer, Packet() {
+    override fun toString(): String {
+      return if (bytes == null) {
+        "EOF()"
+      }
+      else {
+        "Row(${Connection.hex(bytes)})"
+      }
+    }
+    internal fun decode(cols: List<ColumnDefinition>): Map<String,Any?> {
+      return emptyMap()
+    }
   }
 
   class EOF : FromServer, Packet() {
@@ -132,8 +190,8 @@ sealed class Packet {
         }
         ColumnDefinition::class.java -> {
           println("COLUMN_DEFINITION")
-          assert(first == 0x00.toByte())
-          val catalog = getLengthEncodedString(buffer)
+          assert(first == 3.toByte())
+          ByteArray(first.toInt()).apply { buffer.get(this) }//.apply { assert(String(this) == "def") }
           val schema = getLengthEncodedString(buffer)
           val table = getLengthEncodedString(buffer)
           val tableOrg = getLengthEncodedString(buffer)
@@ -148,6 +206,31 @@ sealed class Packet {
           val filler = ByteArray(2).apply { buffer.get(this) }
           assert(start + length == buffer.position())
           return ColumnDefinition(name, table) as T
+        }
+        BinaryResultSet::class.java -> {
+          println("RESULTSET")
+          assert(start + length == buffer.position())
+          return BinaryResultSet(first.toInt()) as T
+        }
+        Row::class.java -> {
+          println("ROW")
+          if (first == 0xfe.toByte()) {
+            /*val affectedRows =*/ getLengthEncodedInteger(buffer)
+            /*val lastInsertId =*/ getLengthEncodedInteger(buffer)
+            /*val status =*/ ByteArray(2).apply { buffer.get(this) }
+            /*val warningCount =*/ buffer.getShort()
+            val info = ByteArray(start + length - buffer.position()).let {
+              buffer.get(it)
+              String(it)
+            }
+            assert(start + length == buffer.position())
+            return Row(null) as T
+          }
+          else {
+            assert(first == 0x00.toByte())
+            val bytes = ByteArray(start + length - buffer.position()).apply { buffer.get(this) }
+            return Row(bytes) as T
+          }
         }
         Handshake::class.java -> {
           println("HANDSHAKE")
