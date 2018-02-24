@@ -12,16 +12,17 @@ import java.util.Date
 internal object BinaryFormat {
 
   @Suppress("UsePropertyAccessSyntax")
-  fun parse(type: Byte, unsigned: Boolean, buffer: ByteBuffer): Any? {
+  fun parse(type: Byte, length: Int, unsigned: Boolean, buffer: ByteBuffer): Any? {
     return when (type) {
+      Types.BIT -> if (length == 1) buffer.get() != 0.toByte() else Bitmap(length).set(buffer).bytes
       Types.BYTE -> buffer.get()
       Types.SHORT -> buffer.getShort()
       Types.INT, Types.INT24 -> buffer.getInt()
       Types.LONG -> buffer.getLong()
       Types.FLOAT -> buffer.getFloat()
       Types.DOUBLE -> buffer.getDouble()
-      Types.DECIMAL -> getLengthEncodedString(buffer).toBigDecimal()
-      Types.DATETIME, Types.TIMESTAMP -> {
+      Types.NUMERIC, Types.DECIMAL -> getLengthEncodedString(buffer).toBigDecimal()
+      Types.DATETIME, Types.DATETIME2, Types.TIMESTAMP, Types.TIMESTAMP2 -> {
         val n = buffer.get()
         assert(n == 7.toByte() || n == 11.toByte())
         val year = buffer.getShort().toInt()

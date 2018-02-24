@@ -100,7 +100,8 @@ sealed class Packet {
   }
 
   class ColumnDefinition(internal val name: String, internal val table: String,
-                         internal val type: Byte, internal val unsigned: Boolean): FromServer, Packet() {
+                         internal val type: Byte, internal val length: Int,
+                         internal val unsigned: Boolean): FromServer, Packet() {
     override fun toString() = "ColumnDefinition(${table}.${name})"
   }
 
@@ -129,7 +130,7 @@ sealed class Packet {
           map[col.name] = null
         }
         else {
-          map[col.name] = BinaryFormat.parse(col.type, col.unsigned, buffer)
+          map[col.name] = BinaryFormat.parse(col.type, col.length, col.unsigned, buffer)
         }
       }
       return map
@@ -214,14 +215,14 @@ sealed class Packet {
           /*val nameOrg =*/ BinaryFormat.getLengthEncodedString(buffer)
           /*val n =*/ BinaryFormat.getLengthEncodedInteger(buffer)
           /*val collation =*/ buffer.getShort()
-          /*val columnLength =*/ buffer.getInt()
+          val columnLength = buffer.getInt()
           val columnType = buffer.get()
           val flags = Bitmap(16).set(buffer)
           val unsigned = flags.get(5)
           /*val maxDigits =*/ buffer.get()
           /*val filler =*/ ByteArray(2).apply { buffer.get(this) }
           assert(start + length == buffer.position())
-          return ColumnDefinition(name, table, columnType, unsigned) as T
+          return ColumnDefinition(name, table, columnType, columnLength, unsigned) as T
         }
         BinaryResultSet::class.java -> {
           println("RESULTSET")

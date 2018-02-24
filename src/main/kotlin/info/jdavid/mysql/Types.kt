@@ -11,7 +11,8 @@ internal object Types {
   val INT24 = 0x09.toByte()     //  MEDIUMINT
   val LONG = 0x08.toByte()      //  BIGINT
 
-  val DECIMAL = 0xf6.toByte()   //  NEWDECIMAL
+  val DECIMAL = 0x00.toByte()
+  val NUMERIC = 0xf6.toByte()   //  NEWDECIMAL
 
   val TIMESTAMP = 0x07.toByte()
   val TIMESTAMP2 = 0x11.toByte()
@@ -27,6 +28,8 @@ internal object Types {
   val MEDIUMBLOB = 0xfa.toByte()
   val LONGBLOB = 0xfb.toByte()
   val BLOB = 0xfc.toByte()
+
+  val BIT = 0x10.toByte()
 
   val JSON = 0xf5.toByte()
 
