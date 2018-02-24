@@ -17,8 +17,8 @@ import java.nio.channels.AsynchronousSocketChannel
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.experimental.EmptyCoroutineContext
 
-class Connection internal constructor(private val channel: AsynchronousSocketChannel,
-                                      private val buffer: ByteBuffer): Closeable {
+class MysqlConnection internal constructor(private val channel: AsynchronousSocketChannel,
+                                           private val buffer: ByteBuffer): Closeable {
   private var statementCounter = 0
 
   override fun close() = channel.close()
@@ -101,9 +101,9 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
 
   inner class PreparedStatement internal constructor(internal val id: Int,
                                                      internal val temporary: Boolean) {
-    suspend fun rows(params: Iterable<Any?> = emptyList()) = this@Connection.rows(this, params)
-    suspend fun affectedRows(params: Iterable<Any?> = emptyList()) = this@Connection.affectedRows(this, params)
-    suspend fun close() = this@Connection.close(this)
+    suspend fun rows(params: Iterable<Any?> = emptyList()) = this@MysqlConnection.rows(this, params)
+    suspend fun affectedRows(params: Iterable<Any?> = emptyList()) = this@MysqlConnection.affectedRows(this, params)
+    suspend fun close() = this@MysqlConnection.close(this)
   }
 
   class ResultSet(private val channel: Channel<Map<String, Any?>>): Closeable {
@@ -115,15 +115,15 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   companion object {
     suspend fun to(
       database: String,
-      credentials: Authentication.Credentials = Authentication.Credentials.UnsecuredCredentials(),
+      credentials: Authentication.MysqlCredentials = Authentication.MysqlCredentials.UnsecuredCredentials(),
       address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 5432)
-    ): Connection {
+    ): MysqlConnection {
       val channel = AsynchronousSocketChannel.open()
       try {
         channel.aConnect(address)
         val buffer = ByteBuffer.allocateDirect(4194304)// needs to hold any RowData message
         buffer.order(ByteOrder.LITTLE_ENDIAN).flip()
-        val connection = Connection(channel, buffer)
+        val connection = MysqlConnection(channel, buffer)
         Authentication.authenticate(connection, database, credentials)
         return connection
       }
@@ -132,7 +132,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         throw e
       }
     }
-    private val logger = LoggerFactory.getLogger(Connection::class.java)
+    private val logger = LoggerFactory.getLogger(MysqlConnection::class.java)
     private fun warn(message: String) = logger.warn(message)
     private fun err(message: String) = logger.error(message)
 

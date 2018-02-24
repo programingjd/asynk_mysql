@@ -5,13 +5,13 @@ import org.junit.Test
 import org.junit.Assert.*
 
 class LocalDbTests {
-  private val credentials: Authentication.Credentials
+  private val credentials: Authentication.MysqlCredentials
   private val databaseName: String
   init {
     val properties = Utils.properties()
     val username = properties.getProperty("mysql_username") ?: "root"
     val password = properties.getProperty("mysql_password") ?: ""
-    credentials = Authentication.Credentials.PasswordCredentials(username, password)
+    credentials = Authentication.MysqlCredentials.PasswordCredentials(username, password)
     databaseName = properties.getProperty("mysql_database") ?: "mysql"
   }
 

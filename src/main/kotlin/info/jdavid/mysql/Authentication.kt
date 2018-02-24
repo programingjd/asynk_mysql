@@ -7,9 +7,9 @@ import java.security.MessageDigest
 
 object Authentication {
 
-  internal suspend fun authenticate(connection: Connection,
+  internal suspend fun authenticate(connection: MysqlConnection,
                                     database: String,
-                                    credentials: Credentials) {
+                                    credentials: MysqlCredentials) {
     val handshake = connection.receive(Packet.Handshake::class.java)
     when (handshake.auth) {
       null -> throw RuntimeException("Unsupported authentication method: null")
@@ -18,7 +18,7 @@ object Authentication {
       )
       "auth_gssapi_client" -> throw Exception("Incompatible credentials.")
       "mysql_native_password" -> {
-        if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
+        if (credentials !is MysqlCredentials.PasswordCredentials) throw Exception("Incompatible credentials.")
         val authResponse = nativePassword(credentials.password, handshake.scramble)
         connection.send(Packet.HandshakeResponse(database, credentials.username, authResponse, handshake))
         val ok = connection.receive(Packet.OK::class.java)
@@ -41,17 +41,17 @@ object Authentication {
 
   class Exception(message: String): RuntimeException(message)
 
-  sealed class Credentials(internal val username: String) {
+  sealed class MysqlCredentials(internal val username: String) {
 
-    class UnsecuredCredentials(username: String = "root"): Credentials(username)
+    class UnsecuredCredentials(username: String = "root"): MysqlCredentials(username)
     class PasswordCredentials(username: String = "root",
-                              internal val password: String = ""): Credentials(username)
+                              internal val password: String = ""): MysqlCredentials(username)
 
     suspend fun connectTo(
       database: String,
       address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress (), 3306)
-    ): Connection {
-      return Connection.to(database, this, address)
+    ): MysqlConnection {
+      return MysqlConnection.to(database, this, address)
     }
 
   }

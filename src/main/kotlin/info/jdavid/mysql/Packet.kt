@@ -115,7 +115,7 @@ sealed class Packet {
         "EOF()"
       }
       else {
-        "Row(${Connection.hex(bytes)})"
+        "Row(${MysqlConnection.hex(bytes)})"
       }
     }
     internal fun decode(cols: List<ColumnDefinition>): Map<String,Any?> {
