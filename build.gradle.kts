@@ -20,11 +20,11 @@ buildscript {
 plugins {
   kotlin("jvm") version "1.2.21"
   `maven-publish`
-  id("com.jfrog.bintray") version "1.7.3"
+  id("com.jfrog.bintray") version "1.8.0"
 }
 
 group = "info.jdavid.mysql"
-version = "1.0.0.0"
+version = "0.9.0.1"
 
 repositories {
   jcenter()
@@ -32,8 +32,8 @@ repositories {
 
 dependencies {
   compile(kotlin("stdlib-jdk8"))
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.22.2")
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.22.2")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.22.3")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.22.3")
   implementation("org.slf4j:slf4j-api:1.7.25")
   testImplementation("junit:junit:4.12")
   testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.4")
