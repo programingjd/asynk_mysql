@@ -96,9 +96,9 @@ internal object BinaryFormat {
         buffer.put(bytes)
       }
       Types.DATETIME, Types.TIMESTAMP -> {
-        val date = when {
-          value is Date -> value.toInstant().atZone(ZoneOffset.UTC)
-          value is Temporal -> utcDateTime(value)
+        val date = when(value) {
+          is Date -> value.toInstant().atZone(ZoneOffset.UTC)
+          is Temporal -> utcDateTime(value)
           else -> throw IllegalArgumentException()
         }
         buffer.put(0x07.toByte())
@@ -110,9 +110,9 @@ internal object BinaryFormat {
         buffer.put(date.second.toByte())
       }
       Types.DATETIME2, Types.TIMESTAMP2 -> {
-        val date = when {
-          value is Date -> value.toInstant().atZone(ZoneOffset.UTC)
-          value is Temporal -> utcDateTime(value)
+        val date = when(value) {
+          is Date -> value.toInstant().atZone(ZoneOffset.UTC)
+          is Temporal -> utcDateTime(value)
           else -> throw IllegalArgumentException()
         }
         buffer.put(0x0b.toByte())
@@ -125,9 +125,9 @@ internal object BinaryFormat {
         buffer.putInt(date.nano / 1000)
       }
       Types.DATE -> {
-        val date = when {
-          value is Date -> value.toInstant().atZone(ZoneOffset.UTC)
-          value is Temporal -> utcDateTime(value)
+        val date = when(value) {
+          is Date -> value.toInstant().atZone(ZoneOffset.UTC)
+          is Temporal -> utcDateTime(value)
           else -> throw IllegalArgumentException()
         }
         buffer.put(0x04.toByte())
