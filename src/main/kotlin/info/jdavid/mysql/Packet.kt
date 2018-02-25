@@ -82,9 +82,9 @@ sealed class Packet {
       buffer.putInt(statementId)
       buffer.putInt(0x00) // no cursor
       val bitmap = Bitmap(list.size)
-      list.forEachIndexed { index, any -> if (list[index] == null) bitmap.set(index, true) }
+      list.forEachIndexed { index, any -> if (any == null) bitmap.set(index, true) }
       buffer.put(bitmap.bytes)
-      buffer.put(1)
+      buffer.put(0x01)
       for (i in 0 until list.size) {
         if (list[i] != null) {
           val col = types[i]
@@ -92,6 +92,7 @@ sealed class Packet {
           buffer.put(if (col.unsigned) 128.toByte() else 0.toByte())
         }
       }
+//      buffer.put(0x00.toByte())
       for (i in 0 until list.size) {
         val value = list[i]
         if (value != null) {

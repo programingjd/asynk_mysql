@@ -88,8 +88,8 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
   private suspend fun prepare(sqlStatement: String, temporary: Boolean): MysqlPreparedStatement {
     send(Packet.StatementPrepare(sqlStatement))
     val prepareOK = receive(Packet.StatementPrepareOK::class.java)
-    for (i in 1..prepareOK.columnCount) receive(Packet.ColumnDefinition::class.java)
     val types = (1..prepareOK.paramCount).map { receive(Packet.ColumnDefinition::class.java) }
+    /*val cols =*/ (1..prepareOK.columnCount).map { receive(Packet.ColumnDefinition::class.java) }
     return MysqlPreparedStatement(prepareOK.statementId, types, temporary)
   }
 

@@ -14,10 +14,10 @@ fun main(args: Array<String>) {
   val database = properties.getProperty("mysql_database") ?: "mysql"
   runBlocking {
     credentials.connectTo(database).use {
-      val preparedStatement = it.prepare("""
-          SELECT * FROM demo WHERE 1
-        """.trimIndent())
-      println(preparedStatement.rows().toList())
+//      val preparedStatement = it.prepare("""
+//          SELECT * FROM demo WHERE 1
+//        """.trimIndent())
+//      println(preparedStatement.rows().toList())
       val inserted = it.affectedRows("INSERT INTO demo (name, flag, time) VALUES(?, ?, NOW())",
                                      listOf("TestInsert", false))
       println(inserted)
