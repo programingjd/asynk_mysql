@@ -7,6 +7,7 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.time.temporal.Temporal
 import java.util.BitSet
 import java.util.Date
@@ -135,8 +136,14 @@ internal object BinaryFormat {
         buffer.put(date.dayOfMonth.toByte())
       }
       Types.VARCHAR, Types.VARSTRING, Types.STRING -> {
-        if (value !is CharSequence) throw IllegalArgumentException()
-        val bytes = value.toString().toByteArray(Charsets.UTF_8)
+        val bytes = when(value) {
+          is CharSequence -> value.toString()
+          is Boolean -> value.toString()
+          is Number -> value.toString()
+          is Temporal -> utcDateTime(value).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+          is Date -> value.toInstant().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+          else -> throw IllegalArgumentException()
+        }.toByteArray(Charsets.UTF_8)
         setLengthEncodedInteger(bytes.size, buffer)
         buffer.put(bytes)
       }
