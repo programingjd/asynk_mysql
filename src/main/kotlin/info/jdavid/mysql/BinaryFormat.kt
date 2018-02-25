@@ -6,6 +6,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import java.time.temporal.Temporal
 import java.util.BitSet
 import java.util.Date
@@ -17,16 +18,16 @@ internal object BinaryFormat {
       Types.BIT -> {
         if (length == 1) {
           buffer.put(when(value) {
-            is Boolean -> if (value == false) 0.toByte() else 1.toByte()
+            is Boolean -> if (value == false) 0x00.toByte() else 0x01.toByte()
             is CharSequence -> when(value.toString().toLowerCase()) {
-              "0", "false", "f", "n", "no" -> 0.toByte()
-              "1", "true", "t", "y", "yes" -> 1.toByte()
+              "0", "false", "f", "n", "no" -> 0x00.toByte()
+              "1", "true", "t", "y", "yes" -> 0x01.toByte()
               else -> throw IllegalArgumentException()
             }
             is Number -> value.toByte()
             is ByteArray -> if (length != 1) throw IllegalArgumentException() else value[0]
             is BitSet -> if (value.size() > 1) throw IllegalArgumentException() else {
-              if (!value.get(0)) 0.toByte() else 1.toByte()
+              if (!value.get(0)) 0x00.toByte() else 0x01.toByte()
             }
             is Bitmap -> if (value.bytes.size - value.offset != 1) {
               throw IllegalArgumentException()
@@ -59,7 +60,7 @@ internal object BinaryFormat {
       Types.BYTE -> {
         buffer.put(
           if (value is Boolean) {
-            if (value) 1.toByte() else 0.toByte()
+            if (value) 0x01.toByte() else 0x00.toByte()
           }
           else {
             if (value !is Number) throw IllegalArgumentException()
@@ -93,11 +94,45 @@ internal object BinaryFormat {
         setLengthEncodedInteger(bytes.size, buffer)
         buffer.put(bytes)
       }
-      Types.DATETIME, Types.DATETIME2, Types.TIMESTAMP, Types.TIMESTAMP2 -> {
-        TODO()
+      Types.DATETIME, Types.TIMESTAMP -> {
+        val date = when {
+          value is Date -> value.toInstant().atZone(ZoneOffset.UTC)
+          value is Temporal -> utcDateTime(value)
+          else -> throw IllegalArgumentException()
+        }
+        buffer.put(0x07.toByte())
+        buffer.putShort(date.year.toShort())
+        buffer.put(date.month.value.toByte())
+        buffer.put(date.dayOfMonth.toByte())
+        buffer.put(date.hour.toByte())
+        buffer.put(date.minute.toByte())
+        buffer.put(date.second.toByte())
+      }
+      Types.DATETIME2, Types.TIMESTAMP2 -> {
+        val date = when {
+          value is Date -> value.toInstant().atZone(ZoneOffset.UTC)
+          value is Temporal -> utcDateTime(value)
+          else -> throw IllegalArgumentException()
+        }
+        buffer.put(0x0b.toByte())
+        buffer.putShort(date.year.toShort())
+        buffer.put(date.month.value.toByte())
+        buffer.put(date.dayOfMonth.toByte())
+        buffer.put(date.hour.toByte())
+        buffer.put(date.minute.toByte())
+        buffer.put(date.second.toByte())
+        buffer.putInt(date.nano / 1000)
       }
       Types.DATE -> {
-        TODO()
+        val date = when {
+          value is Date -> value.toInstant().atZone(ZoneOffset.UTC)
+          value is Temporal -> utcDateTime(value)
+          else -> throw IllegalArgumentException()
+        }
+        buffer.put(0x04.toByte())
+        buffer.putShort(date.year.toShort())
+        buffer.put(date.month.value.toByte())
+        buffer.put(date.dayOfMonth.toByte())
       }
       Types.VARCHAR, Types.VARSTRING, Types.STRING -> {
         if (value !is CharSequence) throw IllegalArgumentException()
@@ -157,11 +192,23 @@ internal object BinaryFormat {
 
   private fun date(temporal: Temporal): Date {
     return Date.from(when (temporal) {
+      is ZonedDateTime -> temporal.toInstant()
       is OffsetDateTime -> temporal.toInstant()
       is LocalDateTime -> temporal.toInstant(ZoneOffset.UTC)
       is LocalDate -> Instant.ofEpochSecond(temporal.atStartOfDay(ZoneOffset.UTC).toEpochSecond())
       else -> throw RuntimeException()
     })
+  }
+
+  private fun utcDateTime(temporal: Temporal): ZonedDateTime {
+    return when (temporal) {
+      is ZonedDateTime -> temporal
+      is OffsetDateTime -> temporal.atZoneSameInstant(ZoneOffset.UTC)
+      is LocalDateTime -> temporal.toInstant(ZoneOffset.UTC).atZone(ZoneOffset.UTC)
+      is LocalDate -> temporal.atStartOfDay(ZoneOffset.UTC)
+      is Instant -> temporal.atZone(ZoneOffset.UTC)
+      else -> throw RuntimeException()
+    }
   }
 
   fun threeByteInteger(buffer: ByteBuffer): Int {

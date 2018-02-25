@@ -93,9 +93,10 @@ sealed class Packet {
         }
       }
       for (i in 0 until list.size) {
-        if (list[i] != null) {
+        val value = list[i]
+        if (value != null) {
           val col = types[i]
-          // TODO('send params')
+          BinaryFormat.write(value, col.type, col.length, col.unsigned, buffer)
         }
       }
       buffer.putInt(start, buffer.position() - start - 4)
