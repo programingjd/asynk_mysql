@@ -67,20 +67,37 @@ sealed class Packet {
     }
   }
 
-  class StatementExecute(private val statementId: Int, private val params: Iterable<Any?>): FromClient, Packet() {
-    override fun toString() = "StatementClose()"
+  class StatementExecute(private val statementId: Int,
+                         private val types: List<ColumnDefinition>,
+                         private val params: Iterable<Any?>): FromClient, Packet() {
+    override fun toString() = "StatementExecute()"
     override fun writeTo(buffer: ByteBuffer) {
       val list = params.toList()
+      if (list.size != types.size) throw IllegalArgumentException(
+        "Expected ${types.size} parameter values but got ${list.size}"
+      )
       val start = buffer.position()
       buffer.putInt(0)
       buffer.put(0x17.toByte())
       buffer.putInt(statementId)
-      buffer.putInt(0x02) //
+      buffer.putInt(0x00) // no cursor
       val bitmap = Bitmap(list.size)
       list.forEachIndexed { index, any -> if (list[index] == null) bitmap.set(index, true) }
       buffer.put(bitmap.bytes)
-      buffer.put(0)
-      // TODO('send params')
+      buffer.put(1)
+      for (i in 0 until list.size) {
+        if (list[i] != null) {
+          val col = types[i]
+          buffer.put(col.type)
+          buffer.put(if (col.unsigned) 128.toByte() else 0.toByte())
+        }
+      }
+      for (i in 0 until list.size) {
+        if (list[i] != null) {
+          val col = types[i]
+          // TODO('send params')
+        }
+      }
       buffer.putInt(start, buffer.position() - start - 4)
     }
   }
@@ -124,7 +141,7 @@ sealed class Packet {
       val n = cols.size
       if (n == 0) return emptyMap()
       val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-      val bitmap =  Bitmap(n).set(buffer)
+      val bitmap =  Bitmap(n, 2).set(buffer)
       val map = LinkedHashMap<String,Any?>(n)
       for (i in 0 until n) {
         val col = cols[i]
@@ -132,7 +149,7 @@ sealed class Packet {
           map[col.name] = null
         }
         else {
-          map[col.name] = BinaryFormat.parse(col.type, col.length, col.unsigned, buffer)
+          map[col.name] = BinaryFormat.read(col.type, col.length, col.unsigned, buffer)
         }
       }
       return map

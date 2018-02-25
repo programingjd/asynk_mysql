@@ -7,12 +7,119 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.temporal.Temporal
+import java.util.BitSet
 import java.util.Date
 
 internal object BinaryFormat {
 
+  fun write(value: Any, type: Byte, length: Int, unsigned: Boolean, buffer: ByteBuffer) {
+    when (type) {
+      Types.BIT -> {
+        if (length == 1) {
+          buffer.put(when(value) {
+            is Boolean -> if (value == false) 0.toByte() else 1.toByte()
+            is CharSequence -> when(value.toString().toLowerCase()) {
+              "0", "false", "f", "n", "no" -> 0.toByte()
+              "1", "true", "t", "y", "yes" -> 1.toByte()
+              else -> throw IllegalArgumentException()
+            }
+            is Number -> value.toByte()
+            is ByteArray -> if (length != 1) throw IllegalArgumentException() else value[0]
+            is BitSet -> if (value.size() > 1) throw IllegalArgumentException() else {
+              if (!value.get(0)) 0.toByte() else 1.toByte()
+            }
+            is Bitmap -> if (value.bytes.size - value.offset != 1) {
+              throw IllegalArgumentException()
+            } else value.bytes[value.offset]
+            else -> throw IllegalArgumentException()
+          })
+        }
+        else {
+          val n: Int = length + 7 / 8
+          buffer.put(when(value) {
+            is BitSet -> {
+              if (value.size() > n) throw IllegalArgumentException()
+              val bytes = value.toByteArray()
+              if (bytes.size == n) bytes else {
+                ByteArray(n).apply { System.arraycopy(bytes, 0, this, 0, bytes.size) }
+              }
+            }
+            is Bitmap -> {
+              if (value.bytes.size - value.offset != n) throw IllegalArgumentException()
+              if (value.offset == 0) value.bytes else value.bytes.copyOfRange(value.offset, value.bytes.size)
+            }
+            is ByteArray -> {
+              if (value.size != n) throw IllegalArgumentException()
+              value
+            }
+            else -> throw IllegalArgumentException()
+          })
+        }
+      }
+      Types.BYTE -> {
+        buffer.put(
+          if (value is Boolean) {
+            if (value) 1.toByte() else 0.toByte()
+          }
+          else {
+            if (value !is Number) throw IllegalArgumentException()
+            value.toByte()
+          }
+        )
+      }
+      Types.SHORT -> {
+        if (value !is Number) throw IllegalArgumentException()
+        buffer.putShort(value.toShort())
+      }
+      Types.INT, Types.INT24 -> {
+        if (value !is Number) throw IllegalArgumentException()
+        buffer.putInt(value.toInt())
+      }
+      Types.LONG -> {
+        if (value !is Number) throw IllegalArgumentException()
+        buffer.putLong(value.toLong())
+      }
+      Types.FLOAT -> {
+        if (value !is Number) throw IllegalArgumentException()
+        buffer.putFloat(value.toFloat())
+      }
+      Types.DOUBLE -> {
+        if (value !is Number) throw IllegalArgumentException()
+        buffer.putDouble(value.toDouble())
+      }
+      Types.NUMERIC, Types.DECIMAL -> {
+        if (value !is Number) throw IllegalArgumentException()
+        val bytes = value.toString().toByteArray(Charsets.US_ASCII)
+        setLengthEncodedInteger(bytes.size, buffer)
+        buffer.put(bytes)
+      }
+      Types.DATETIME, Types.DATETIME2, Types.TIMESTAMP, Types.TIMESTAMP2 -> {
+        TODO()
+      }
+      Types.DATE -> {
+        TODO()
+      }
+      Types.VARCHAR, Types.VARSTRING, Types.STRING -> {
+        if (value !is CharSequence) throw IllegalArgumentException()
+        val bytes = value.toString().toByteArray(Charsets.UTF_8)
+        setLengthEncodedInteger(bytes.size, buffer)
+        buffer.put(bytes)
+      }
+      Types.BLOB, Types.TINYBLOB, Types.MEDIUMBLOB, Types.LONGBLOB -> {
+        val bytes = when {
+          value is CharSequence -> value.toString().toByteArray(Charsets.UTF_8)
+          value is ByteArray -> value
+          else -> throw IllegalArgumentException()
+        }
+        setLengthEncodedInteger(bytes.size, buffer)
+        buffer.put(bytes)
+      }
+      else -> throw RuntimeException("Unsupported type: ${type}")
+    }
+  }
+
   @Suppress("UsePropertyAccessSyntax")
-  fun parse(type: Byte, length: Int, unsigned: Boolean, buffer: ByteBuffer): Any? {
+  fun read(type: Byte, length: Int, unsigned: Boolean, buffer: ByteBuffer): Any? {
     return when (type) {
       Types.BIT -> if (length == 1) buffer.get() != 0.toByte() else Bitmap(length).set(buffer).bytes
       Types.BYTE -> buffer.get()
@@ -73,6 +180,17 @@ internal object BinaryFormat {
       0xfd.toByte() -> threeByteInteger(buffer).toLong()
       0xfc.toByte() -> buffer.getInt().toLong()
       else -> first.toLong()
+    }
+  }
+
+  fun setLengthEncodedInteger(value: Int, buffer: ByteBuffer) {
+    when {
+      value < 251 -> buffer.put(value.toByte())
+      value < 65536 -> {
+        buffer.put(0xfc.toByte())
+        buffer.putShort(value.toShort())
+      }
+      else -> TODO()
     }
   }
 

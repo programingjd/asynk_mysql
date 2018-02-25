@@ -2,7 +2,7 @@ package info.jdavid.mysql
 
 import java.nio.ByteBuffer
 
-internal class Bitmap(n: Int, private val offset: Int = 0) {
+internal class Bitmap(n: Int, val offset: Int = 0) {
   internal val bytes = ByteArray((n + 7 + offset) / 8)
 
   fun set(buffer: ByteBuffer): Bitmap {

@@ -37,7 +37,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
 
   override suspend fun affectedRows(preparedStatement: PreparedStatement, params: Iterable<Any?>): Int {
     if (preparedStatement !is MysqlPreparedStatement) throw IllegalArgumentException()
-    send(Packet.StatementExecute(preparedStatement.id, params))
+    send(Packet.StatementExecute(preparedStatement.id, preparedStatement.types, params))
     val ok = receive(Packet.OK::class.java)
     return ok.count
   }
@@ -53,7 +53,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
 
   override suspend fun rows(preparedStatement: PreparedStatement, params: Iterable<Any?>): MysqlResultSet {
     if (preparedStatement !is MysqlPreparedStatement) throw IllegalArgumentException()
-    send(Packet.StatementExecute(preparedStatement.id, params))
+    send(Packet.StatementExecute(preparedStatement.id, preparedStatement.types, params))
     val rs = receive(Packet.BinaryResultSet::class.java)
     val n = rs.columnCount
     val cols = ArrayList<Packet.ColumnDefinition>(n)
@@ -89,8 +89,8 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     send(Packet.StatementPrepare(sqlStatement))
     val prepareOK = receive(Packet.StatementPrepareOK::class.java)
     for (i in 1..prepareOK.columnCount) receive(Packet.ColumnDefinition::class.java)
-    for (i in 1..prepareOK.paramCount) receive(Packet.ColumnDefinition::class.java)
-    return MysqlPreparedStatement(prepareOK.statementId, temporary)
+    val types = (1..prepareOK.paramCount).map { receive(Packet.ColumnDefinition::class.java) }
+    return MysqlPreparedStatement(prepareOK.statementId, types, temporary)
   }
 
   internal suspend fun send(packet: Packet.FromClient) {
@@ -118,6 +118,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
 
   inner class MysqlPreparedStatement internal constructor(
                                      internal val id: Int,
+                                     internal val types: List<Packet.ColumnDefinition>,
                                      internal val temporary: Boolean): PreparedStatement {
     override suspend fun rows() = this@MysqlConnection.rows(this)
     override suspend fun rows(params: Iterable<Any?>) = this@MysqlConnection.rows(this, params)
