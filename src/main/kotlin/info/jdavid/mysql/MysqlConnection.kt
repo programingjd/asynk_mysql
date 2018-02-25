@@ -36,7 +36,10 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
   )
 
   override suspend fun affectedRows(preparedStatement: PreparedStatement, params: Iterable<Any?>): Int {
-    TODO()
+    if (preparedStatement !is MysqlPreparedStatement) throw IllegalArgumentException()
+    send(Packet.StatementExecute(preparedStatement.id, params))
+    val ok = receive(Packet.OK::class.java)
+    return ok.count
   }
 
   override suspend fun rows(sqlStatement: String) = rows(sqlStatement, emptyList())
@@ -67,7 +70,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       }
       if (preparedStatement.temporary) {
         send(Packet.StatementReset(preparedStatement.id))
-        val ok = receive(Packet.OK::class.java)
+        /*val ok =*/ receive(Packet.OK::class.java)
       }
       channel.close()
     }
@@ -104,7 +107,13 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     val n = channel.aRead(buffer, 5000L, TimeUnit.MILLISECONDS)
     if (n == left) throw RuntimeException("Connection buffer too small.")
     buffer.flip()
-    return Packet.fromBytes(buffer, type)
+    try {
+      return Packet.fromBytes(buffer, type)
+    }
+    catch (e: Packet.Exception) {
+      if (e.message != null) err(e.message)
+      throw RuntimeException(e)
+    }
   }
 
   inner class MysqlPreparedStatement internal constructor(
@@ -146,7 +155,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       }
     }
     private val logger = LoggerFactory.getLogger(MysqlConnection::class.java)
-    private fun warn(message: String) = logger.warn(message)
+//    private fun warn(message: String) = logger.warn(message)
     private fun err(message: String) = logger.error(message)
 
     internal fun hex(bytes: ByteArray): String {

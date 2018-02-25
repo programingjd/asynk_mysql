@@ -88,7 +88,8 @@ sealed class Packet {
   //-----------------------------------------------------------------------------------------------
 
 
-  class OK(internal val sequenceId: Byte, private val info: String): FromServer, Packet() {
+  class OK(internal val sequenceId: Byte, internal val count: Int,
+           private val info: String): FromServer, Packet() {
     override fun toString() = "GenericOK(){\n${info}\n}"
   }
 
@@ -173,7 +174,7 @@ sealed class Packet {
         OK::class.java -> {
           println("OK")
           assert(first == 0x00.toByte() || first == 0xfe.toByte())
-          /*val affectedRows =*/ BinaryFormat.getLengthEncodedInteger(buffer)
+          val affectedRows = BinaryFormat.getLengthEncodedInteger(buffer).toInt()
           /*val lastInsertId =*/ BinaryFormat.getLengthEncodedInteger(buffer)
           /*val status =*/ ByteArray(2).apply { buffer.get(this) }
           /*val warningCount =*/ buffer.getShort()
@@ -182,7 +183,7 @@ sealed class Packet {
             String(it)
           }
           assert(start + length == buffer.position())
-          OK(sequenceId, info) as T
+          OK(sequenceId, affectedRows, info) as T
         }
         EOF::class.java -> {
           println("EOF")
