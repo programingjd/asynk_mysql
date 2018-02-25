@@ -7,12 +7,13 @@ import kotlinx.coroutines.experimental.runBlocking
 fun json(any: Any?) = ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT).writeValueAsString(any)
 
 fun main(args: Array<String>) {
-  val username = "root"
-  val password = "root"
-  val database = "test"
+  val properties = Utils.properties()
+  val username = properties.getProperty("mysql_username") ?: "root"
+  val password = properties.getProperty("mysql_password") ?: ""
+  val credentials = MysqlAuthentication.Credentials.PasswordCredentials(username, password)
+  val database = properties.getProperty("mysql_database") ?: "mysql"
   runBlocking {
-    MysqlAuthentication.MysqlCredentials.PasswordCredentials(username, password).
-      connectTo(database).use {
+    credentials.connectTo(database).use {
         val preparedStatement = it.prepare("""
             SELECT * FROM demo WHERE 1
           """.trimIndent())
