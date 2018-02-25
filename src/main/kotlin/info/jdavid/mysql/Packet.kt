@@ -75,11 +75,12 @@ sealed class Packet {
       buffer.putInt(0)
       buffer.put(0x17.toByte())
       buffer.putInt(statementId)
-      buffer.putInt(0) //
+      buffer.putInt(0x02) //
       val bitmap = Bitmap(list.size)
       list.forEachIndexed { index, any -> if (list[index] == null) bitmap.set(index, true) }
       buffer.put(bitmap.bytes)
       buffer.put(0)
+      // TODO('send params')
       buffer.putInt(start, buffer.position() - start - 4)
     }
   }
