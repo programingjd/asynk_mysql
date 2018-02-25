@@ -4,8 +4,9 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.SocketAddress
 import java.security.MessageDigest
+typealias MysqlCredentials=info.jdavid.sql.Credentials<MysqlConnection>
 
-object Authentication {
+object MysqlAuthentication {
 
   internal suspend fun authenticate(connection: MysqlConnection,
                                     database: String,
@@ -18,7 +19,7 @@ object Authentication {
       )
       "auth_gssapi_client" -> throw Exception("Incompatible credentials.")
       "mysql_native_password" -> {
-        if (credentials !is MysqlCredentials.PasswordCredentials) throw Exception("Incompatible credentials.")
+        if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
         val authResponse = nativePassword(credentials.password, handshake.scramble)
         connection.send(Packet.HandshakeResponse(database, credentials.username, authResponse, handshake))
         val ok = connection.receive(Packet.OK::class.java)
@@ -41,16 +42,17 @@ object Authentication {
 
   class Exception(message: String): RuntimeException(message)
 
-  sealed class MysqlCredentials(internal val username: String) {
+  sealed class Credentials(internal val username: String): MysqlCredentials {
 
-    class UnsecuredCredentials(username: String = "root"): MysqlCredentials(username)
+    class UnsecuredCredentials(username: String = "root"): Credentials(username)
     class PasswordCredentials(username: String = "root",
-                              internal val password: String = ""): MysqlCredentials(username)
+                              internal val password: String = ""): Credentials(username)
 
-    suspend fun connectTo(
-      database: String,
-      address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress (), 3306)
-    ): MysqlConnection {
+    override suspend fun connectTo(database: String) = connectTo(
+      database, InetSocketAddress(InetAddress.getLoopbackAddress(), 3306)
+    )
+
+    override suspend fun connectTo(database: String, address: SocketAddress): MysqlConnection {
       return MysqlConnection.to(database, this, address)
     }
 

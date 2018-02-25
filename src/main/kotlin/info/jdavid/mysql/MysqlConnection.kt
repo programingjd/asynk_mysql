@@ -1,5 +1,6 @@
 package info.jdavid.mysql
 
+import info.jdavid.sql.Connection
 import kotlinx.coroutines.experimental.channels.Channel
 import kotlinx.coroutines.experimental.channels.toList
 import kotlinx.coroutines.experimental.launch
@@ -7,7 +8,6 @@ import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
 import org.slf4j.LoggerFactory
-import java.io.Closeable
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.SocketAddress
@@ -16,31 +16,40 @@ import java.nio.ByteOrder
 import java.nio.channels.AsynchronousSocketChannel
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.experimental.EmptyCoroutineContext
+typealias PreparedStatement= Connection.PreparedStatement<MysqlConnection>
+
 
 class MysqlConnection internal constructor(private val channel: AsynchronousSocketChannel,
-                                           private val buffer: ByteBuffer): Closeable {
-  private var statementCounter = 0
+                                           private val buffer: ByteBuffer): Connection<MysqlConnection> {
 
   override fun close() = channel.close()
 
-  suspend fun affectedRows(sqlStatement: String, params: Iterable<Any?> = emptyList()): Int {
+  override suspend fun affectedRows(sqlStatement: String) = affectedRows(sqlStatement, emptyList())
+
+  override suspend fun affectedRows(sqlStatement: String, params: Iterable<Any?>): Int {
     val statement = prepare(sqlStatement, true)
     return affectedRows(statement, params)
   }
 
-  suspend fun affectedRows(preparedStatement: PreparedStatement,
-                           params: Iterable<Any?> = emptyList()): Int {
+  override suspend fun affectedRows(preparedStatement: PreparedStatement) = affectedRows(
+    preparedStatement, emptyList()
+  )
+
+  override suspend fun affectedRows(preparedStatement: PreparedStatement, params: Iterable<Any?>): Int {
     TODO()
   }
 
-  suspend fun rows(sqlStatement: String,
-                   params: Iterable<Any?> = emptyList()): ResultSet {
+  override suspend fun rows(sqlStatement: String) = rows(sqlStatement, emptyList())
+
+  override suspend fun rows(sqlStatement: String, params: Iterable<Any?>): MysqlResultSet {
     val statement = prepare(sqlStatement, true)
     return rows(statement, params)
   }
 
-  suspend fun rows(preparedStatement: PreparedStatement,
-                   params: Iterable<Any?> = emptyList()): ResultSet {
+  override suspend fun rows(preparedStatement: PreparedStatement) = rows(preparedStatement, emptyList())
+
+  override suspend fun rows(preparedStatement: PreparedStatement, params: Iterable<Any?>): MysqlResultSet {
+    if (preparedStatement !is MysqlPreparedStatement) throw IllegalArgumentException()
     send(Packet.StatementExecute(preparedStatement.id, params))
     val rs = receive(Packet.BinaryResultSet::class.java)
     val n = rs.columnCount
@@ -48,7 +57,6 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     for (i in 0 until n) {
       cols.add(receive(Packet.ColumnDefinition::class.java))
     }
-
     val channel = Channel<Map<String, Any?>>()
     launch(EmptyCoroutineContext) {
       while (true) {
@@ -63,23 +71,23 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       }
       channel.close()
     }
-    return ResultSet(channel)
+    return MysqlResultSet(channel)
   }
 
-  suspend fun close(preparedStatement: PreparedStatement) {
+  suspend fun close(preparedStatement: MysqlPreparedStatement) {
     send(Packet.StatementClose(preparedStatement.id))
   }
 
-  suspend fun prepare(sqlStatement: String): PreparedStatement {
+  override suspend fun prepare(sqlStatement: String): MysqlPreparedStatement {
     return prepare(sqlStatement, false)
   }
 
-  private suspend fun prepare(sqlStatement: String, temporary: Boolean): PreparedStatement {
+  private suspend fun prepare(sqlStatement: String, temporary: Boolean): MysqlPreparedStatement {
     send(Packet.StatementPrepare(sqlStatement))
     val prepareOK = receive(Packet.StatementPrepareOK::class.java)
     for (i in 1..prepareOK.columnCount) receive(Packet.ColumnDefinition::class.java)
     for (i in 1..prepareOK.paramCount) receive(Packet.ColumnDefinition::class.java)
-    return PreparedStatement(prepareOK.statementId, temporary)
+    return MysqlPreparedStatement(prepareOK.statementId, temporary)
   }
 
   internal suspend fun send(packet: Packet.FromClient) {
@@ -99,23 +107,28 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     return Packet.fromBytes(buffer, type)
   }
 
-  inner class PreparedStatement internal constructor(internal val id: Int,
-                                                     internal val temporary: Boolean) {
-    suspend fun rows(params: Iterable<Any?> = emptyList()) = this@MysqlConnection.rows(this, params)
-    suspend fun affectedRows(params: Iterable<Any?> = emptyList()) = this@MysqlConnection.affectedRows(this, params)
-    suspend fun close() = this@MysqlConnection.close(this)
+  inner class MysqlPreparedStatement internal constructor(
+                                     internal val id: Int,
+                                     internal val temporary: Boolean): PreparedStatement {
+    override suspend fun rows() = this@MysqlConnection.rows(this)
+    override suspend fun rows(params: Iterable<Any?>) = this@MysqlConnection.rows(this, params)
+    override suspend fun affectedRows() = this@MysqlConnection.affectedRows(this)
+    override suspend fun affectedRows(
+      params: Iterable<Any?>
+    ) = this@MysqlConnection.affectedRows(this, params)
+    override suspend fun close() = this@MysqlConnection.close(this)
   }
 
-  class ResultSet(private val channel: Channel<Map<String, Any?>>): Closeable {
-    operator fun iterator() = channel.iterator()
+  class MysqlResultSet(private val channel: Channel<Map<String, Any?>>): Connection.ResultSet {
+    override operator fun iterator() = channel.iterator()
     override fun close() { channel.cancel() }
-    suspend fun toList() = channel.toList()
+    override suspend fun toList() = channel.toList()
   }
 
   companion object {
     suspend fun to(
       database: String,
-      credentials: Authentication.MysqlCredentials = Authentication.MysqlCredentials.UnsecuredCredentials(),
+      credentials: MysqlAuthentication.Credentials = MysqlAuthentication.Credentials.UnsecuredCredentials(),
       address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 5432)
     ): MysqlConnection {
       val channel = AsynchronousSocketChannel.open()
@@ -124,7 +137,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
         val buffer = ByteBuffer.allocateDirect(4194304)// needs to hold any RowData message
         buffer.order(ByteOrder.LITTLE_ENDIAN).flip()
         val connection = MysqlConnection(channel, buffer)
-        Authentication.authenticate(connection, database, credentials)
+        MysqlAuthentication.authenticate(connection, database, credentials)
         return connection
       }
       catch (e: Exception) {

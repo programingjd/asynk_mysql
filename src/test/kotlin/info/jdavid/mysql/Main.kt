@@ -11,7 +11,7 @@ fun main(args: Array<String>) {
   val password = "root"
   val database = "test"
   runBlocking {
-    Authentication.MysqlCredentials.PasswordCredentials(username, password).
+    MysqlAuthentication.MysqlCredentials.PasswordCredentials(username, password).
       connectTo(database).use {
         val preparedStatement = it.prepare("""
             SELECT * FROM demo WHERE 1
