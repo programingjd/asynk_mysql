@@ -164,7 +164,7 @@ internal object BinaryFormat {
   fun read(type: Byte, length: Int, unsigned: Boolean, binary: Boolean, buffer: ByteBuffer): Any? {
     return when (type) {
       Types.BIT -> if (length == 1) buffer.get() != 0.toByte() else Bitmap(length).set(buffer).bytes
-      Types.BYTE -> buffer.get()
+      Types.BYTE -> if (length == 1) buffer.get() != 0.toByte() else buffer.get()
       Types.SHORT -> buffer.getShort()
       Types.INT, Types.INT24 -> buffer.getInt()
       Types.LONG -> buffer.getLong()
