@@ -72,7 +72,6 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       while (true) {
         val row = receive(Packet.Row::class.java)
         if (row.bytes == null) break
-        println(row)
         channel.send(row.decode(cols))
       }
       if (preparedStatement.temporary) {

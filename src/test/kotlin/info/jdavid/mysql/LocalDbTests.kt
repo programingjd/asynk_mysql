@@ -25,6 +25,7 @@ class LocalDbTests {
             CREATE TEMPORARY TABLE test (
               id             serial    PRIMARY KEY,
               name           text      NOT NULL,
+              bytes          blob      DEFAULT NULL,
               active         boolean   DEFAULT FALSE NOT NULL,
               creation_date  timestamp DEFAULT NOW()
             )
@@ -53,6 +54,8 @@ class LocalDbTests {
             SELECT * FROM test ORDER BY name
           """.trimIndent()
         ).toList().apply {
+          val list = this
+          println(list)
           assertEquals(3, size)
           assertEquals("Name1", get(0)["name"])
           assertFalse(get(0)["active"] as Boolean)

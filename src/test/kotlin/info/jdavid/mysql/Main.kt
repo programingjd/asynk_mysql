@@ -19,9 +19,10 @@ fun main(args: Array<String>) {
 //          SELECT * FROM demo WHERE 1
 //        """.trimIndent())
 //      println(preparedStatement.rows().toList())
-      val inserted = it.affectedRows("INSERT INTO demo (name, flag, time) VALUES(?, ?, NOW())",
-                                     listOf("TestInsert", false))
-      println(inserted)
+//      val inserted = it.affectedRows("INSERT INTO demo (name, flag, time) VALUES(?, ?, NOW())",
+//                                     listOf("TestInsert", false))
+//      println(inserted)
+      println(it.rows("SELECT * FROM demo WHERE flag=?", listOf(true)).toList().joinToString("\n"))
     }
   }
 }

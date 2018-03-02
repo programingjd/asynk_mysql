@@ -138,7 +138,7 @@ internal object BinaryFormat {
       Types.VARCHAR, Types.VARSTRING, Types.STRING -> {
         val bytes = when(value) {
           is CharSequence -> value.toString()
-          is Boolean -> value.toString()
+          is Boolean -> if (value) "1" else "0"
           is Number -> value.toString()
           is Temporal -> utcDateTime(value).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
           is Date -> value.toInstant().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
@@ -161,7 +161,7 @@ internal object BinaryFormat {
   }
 
   @Suppress("UsePropertyAccessSyntax")
-  fun read(type: Byte, length: Int, unsigned: Boolean, buffer: ByteBuffer): Any? {
+  fun read(type: Byte, length: Int, unsigned: Boolean, binary: Boolean, buffer: ByteBuffer): Any? {
     return when (type) {
       Types.BIT -> if (length == 1) buffer.get() != 0.toByte() else Bitmap(length).set(buffer).bytes
       Types.BYTE -> buffer.get()
@@ -192,7 +192,9 @@ internal object BinaryFormat {
         date(LocalDate.of(year, month, day))
       }
       Types.VARCHAR, Types.VARSTRING, Types.STRING -> getLengthEncodedString(buffer)
-      Types.BLOB, Types.TINYBLOB, Types.MEDIUMBLOB, Types.LONGBLOB -> getLengthEncodedBlob(buffer)
+      Types.BLOB, Types.TINYBLOB, Types.MEDIUMBLOB, Types.LONGBLOB -> {
+        if (binary) getLengthEncodedBlob(buffer) else getLengthEncodedString(buffer)
+      }
       else -> throw RuntimeException("Unsupported type: ${type}")
     }
   }

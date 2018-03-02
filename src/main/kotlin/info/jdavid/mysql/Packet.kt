@@ -110,7 +110,8 @@ sealed class Packet {
       buffer.putInt(0)
       buffer.put(0x17.toByte())
       buffer.putInt(statementId)
-      buffer.putInt(0x00) // no cursor
+      buffer.put(0x00) // no cursor
+      buffer.putInt(1) // iteration count
       val bitmap = Bitmap(list.size)
       list.forEachIndexed { index, any -> if (any == null) bitmap.set(index, true) }
       buffer.put(bitmap.bytes)
@@ -152,7 +153,8 @@ sealed class Packet {
 
   class ColumnDefinition(internal val name: String, internal val table: String,
                          internal val type: Byte, internal val length: Int,
-                         internal val unsigned: Boolean): FromServer, Packet() {
+                         internal val unsigned: Boolean,
+                         internal val binary: Boolean): FromServer, Packet() {
     override fun toString() = "ColumnDefinition(${table}.${name})"
   }
 
@@ -181,7 +183,7 @@ sealed class Packet {
           map[col.name] = null
         }
         else {
-          map[col.name] = BinaryFormat.read(col.type, col.length, col.unsigned, buffer)
+          map[col.name] = BinaryFormat.read(col.type, col.length, col.unsigned, col.binary, buffer)
         }
       }
       return map
@@ -222,7 +224,6 @@ sealed class Packet {
       }
       return when (expected) {
         OK::class.java -> {
-          println("OK")
           assert(first == 0x00.toByte() || first == 0xfe.toByte())
           val affectedRows = BinaryFormat.getLengthEncodedInteger(buffer).toInt()
           /*val lastInsertId =*/ BinaryFormat.getLengthEncodedInteger(buffer)
@@ -236,7 +237,6 @@ sealed class Packet {
           OK(sequenceId, affectedRows, info) as T
         }
         EOF::class.java -> {
-          println("EOF")
           assert(first == 0xfe.toByte())
           // CLIENT_DEPRECATE_EOF is set -> EOF is replaced with OK
           /* val warningCount =*/ buffer.getShort()
@@ -245,7 +245,6 @@ sealed class Packet {
           return EOF() as T
         }
         StatementPrepareOK::class.java -> {
-          println("STMT_PREPARE_OK")
           assert(first == 0x00.toByte())
           val statementId = buffer.getInt()
           val columnCount = buffer.getShort()
@@ -256,7 +255,6 @@ sealed class Packet {
           StatementPrepareOK(sequenceId, statementId, columnCount, paramCount) as T
         }
         ColumnDefinition::class.java -> {
-          println("COLUMN_DEFINITION")
           assert(first == 3.toByte())
           ByteArray(first.toInt()).apply { buffer.get(this) }//.apply { assert(String(this) == "def") }
           /*val schema =*/ BinaryFormat.getLengthEncodedString(buffer)
@@ -269,19 +267,19 @@ sealed class Packet {
           val columnLength = buffer.getInt()
           val columnType = buffer.get()
           val flags = Bitmap(16).set(buffer)
+          val binary = flags.get(7)
           val unsigned = flags.get(5)
           /*val maxDigits =*/ buffer.get()
           /*val filler =*/ ByteArray(2).apply { buffer.get(this) }
           assert(start + length == buffer.position())
-          return ColumnDefinition(name, table, columnType, columnLength, unsigned) as T
+          println("${name} -> ${Integer.toHexString(columnType.toInt() and 0xff)}")
+          return ColumnDefinition(name, table, columnType, columnLength, unsigned, binary) as T
         }
         BinaryResultSet::class.java -> {
-          println("RESULTSET")
           assert(start + length == buffer.position())
           return BinaryResultSet(first.toInt()) as T
         }
         Row::class.java -> {
-          println("ROW")
           if (first == 0xfe.toByte()) {
             /*val affectedRows =*/ BinaryFormat.getLengthEncodedInteger(buffer)
             /*val lastInsertId =*/ BinaryFormat.getLengthEncodedInteger(buffer)
@@ -301,7 +299,6 @@ sealed class Packet {
           }
         }
         Handshake::class.java -> {
-          println("HANDSHAKE")
           assert(first == 0x0a.toByte())
           /*val serverVersion =*/ BinaryFormat.getNullTerminatedString(buffer)
           val connectionId = buffer.getInt()
