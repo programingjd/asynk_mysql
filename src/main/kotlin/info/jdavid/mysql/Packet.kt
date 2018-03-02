@@ -10,7 +10,7 @@ sealed class Packet {
     fun writeTo(buffer: ByteBuffer)
   }
 
-  class Quit(): FromClient, Packet() {
+  class Quit: FromClient, Packet() {
     override fun toString() = "Quit()"
     override fun writeTo(buffer: ByteBuffer) {
       val start = buffer.position()
@@ -20,7 +20,7 @@ sealed class Packet {
     }
   }
 
-  class Debug(): FromClient, Packet() {
+  class Debug: FromClient, Packet() {
     override fun toString() = "Debug()"
     override fun writeTo(buffer: ByteBuffer) {
       val start = buffer.position()
@@ -30,7 +30,7 @@ sealed class Packet {
     }
   }
 
-  class Ping(): FromClient, Packet() {
+  class Ping: FromClient, Packet() {
     override fun toString() = "Ping()"
     override fun writeTo(buffer: ByteBuffer) {
       val start = buffer.position()

@@ -136,7 +136,8 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     override suspend fun aClose() = this@MysqlConnection.close(this)
   }
 
-  class MysqlResultSet(private val channel: Channel<Map<String, Any?>>): Connection.ResultSet {
+  class MysqlResultSet internal constructor(
+                       private val channel: Channel<Map<String, Any?>>): Connection.ResultSet {
     override operator fun iterator() = channel.iterator()
     override fun close() { channel.cancel() }
     override suspend fun toList() = channel.toList()
