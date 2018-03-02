@@ -22,7 +22,14 @@ typealias PreparedStatement= Connection.PreparedStatement<MysqlConnection>
 class MysqlConnection internal constructor(private val channel: AsynchronousSocketChannel,
                                            private val buffer: ByteBuffer): Connection<MysqlConnection> {
 
-  override fun close() = channel.close()
+  override suspend fun aClose() {
+    try {
+      send(Packet.Quit())
+    }
+    finally {
+      channel.close()
+    }
+  }
 
   override suspend fun affectedRows(sqlStatement: String) = affectedRows(sqlStatement, emptyList())
 
@@ -126,7 +133,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     override suspend fun affectedRows(
       params: Iterable<Any?>
     ) = this@MysqlConnection.affectedRows(this, params)
-    override suspend fun close() = this@MysqlConnection.close(this)
+    override suspend fun aClose() = this@MysqlConnection.close(this)
   }
 
   class MysqlResultSet(private val channel: Channel<Map<String, Any?>>): Connection.ResultSet {

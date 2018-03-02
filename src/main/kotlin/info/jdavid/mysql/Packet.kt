@@ -10,10 +10,40 @@ sealed class Packet {
     fun writeTo(buffer: ByteBuffer)
   }
 
+  class Quit(): FromClient, Packet() {
+    override fun toString() = "Quit()"
+    override fun writeTo(buffer: ByteBuffer) {
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put(0x01)
+      buffer.putInt(start, buffer.position() - start - 4)
+    }
+  }
+
+  class Debug(): FromClient, Packet() {
+    override fun toString() = "Debug()"
+    override fun writeTo(buffer: ByteBuffer) {
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put(0x0d)
+      buffer.putInt(start, buffer.position() - start - 4)
+    }
+  }
+
+  class Ping(): FromClient, Packet() {
+    override fun toString() = "Ping()"
+    override fun writeTo(buffer: ByteBuffer) {
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put(0x0e)
+      buffer.putInt(start, buffer.position() - start - 4)
+    }
+  }
+
   class HandshakeResponse(private val database: String,
                           private val username: String, private val authResponse: ByteArray,
                           private val handshake: Handshake): FromClient, Packet() {
-
+    override fun toString() = "HandshakeResponse()"
     override fun writeTo(buffer: ByteBuffer) {
       val start = buffer.position()
       buffer.putInt(0)
