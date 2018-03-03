@@ -223,7 +223,6 @@ sealed class Packet {
     internal fun <T: FromServer> fromBytes(buffer: ByteBuffer, expected: Class<T>?): T {
       val length = BinaryFormat.threeByteInteger(buffer)
       val sequenceId = buffer.get()
-      println("sequenceId: ${sequenceId}")
       if (length > buffer.remaining()) throw RuntimeException("Connection buffer too small.")
       val start = buffer.position()
       val first = buffer.get()
