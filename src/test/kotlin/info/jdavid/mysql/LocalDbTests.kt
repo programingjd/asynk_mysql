@@ -4,6 +4,7 @@ import info.jdavid.sql.use
 import kotlinx.coroutines.experimental.runBlocking
 import org.junit.Test
 import org.junit.Assert.*
+import java.math.BigInteger
 
 class LocalDbTests {
   private val credentials: MysqlAuthentication.Credentials
@@ -54,8 +55,6 @@ class LocalDbTests {
             SELECT * FROM test ORDER BY name
           """.trimIndent()
         ).toList().apply {
-          val list = this
-          println(list)
           assertEquals(3, size)
           assertEquals("Name1", get(0)["name"])
           assertFalse(get(0)["active"] as Boolean)
@@ -161,6 +160,101 @@ class LocalDbTests {
             fail("Execution of closed prepared statement should have failed.")
           }
           catch (ignore: Exception) {}
+        }
+      }
+    }
+  }
+
+  @Test
+  fun testUnsigned() {
+    runBlocking {
+      credentials.connectTo(databaseName).use {
+        assertEquals(0, it.affectedRows(
+          """
+            CREATE TEMPORARY TABLE test (
+              id             serial    PRIMARY KEY,
+              i1             integer   UNSIGNED NOT NULL DEFAULT 4294967295,
+              i2             bigint    UNSIGNED NOT NULL
+            )
+          """.trimIndent()
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (i1, i2) VALUES (?, ?)
+          """.trimIndent(),
+          listOf(2400000000L, BigInteger("10000000000000000000"))
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (i2) VALUES (?)
+          """.trimIndent(),
+          listOf(1)
+        ))
+        it.rows(
+          """
+            SELECT * FROM test ORDER BY id
+          """.trimIndent()
+        ).toList().apply {
+          assertEquals(2, size)
+          assertEquals(2400000000L, get(0)["i1"])
+          assertEquals(BigInteger("10000000000000000000"), get(0)["i2"])
+          assertEquals(4294967295L, get(1)["i1"])
+          assertEquals(BigInteger.valueOf(1L), get(1)["i2"])
+        }
+      }
+    }
+  }
+
+
+  @Test
+  fun testBoolean() {
+    runBlocking {
+      credentials.connectTo(databaseName).use {
+        assertEquals(0, it.affectedRows(
+          """
+            CREATE TEMPORARY TABLE test (
+              id             serial    PRIMARY KEY,
+              b1             bit       NOT NULL,
+              b2             boolean   NOT NULL,
+              b3             bit       DEFAULT NULL,
+              b4             boolean   DEFAULT FALSE NOT NULL,
+              b5             bit       DEFAULT TRUE NOT NULL
+            )
+          """.trimIndent()
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (b1, b2, b3) VALUES (?, ?, ?)
+          """.trimIndent(),
+          listOf(true, true, true)
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (b1, b2, b3) VALUES (?, ?, ?)
+          """.trimIndent(),
+          listOf(false, false, false)
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (b1, b2, b3, b4, b5) VALUES (?, ?, ?, ?, ?)
+          """.trimIndent(),
+          listOf(true, true, true, true, true)
+        ))
+        it.rows(
+          """
+            SELECT * FROM test ORDER BY id
+          """.trimIndent()
+        ).toList().apply {
+          assertEquals(3, size)
+          for (i in 1..5) {
+            assertEquals(i == 4, get(0)["b${i}"])
+          }
+          for (i in 1..5) {
+            assertEquals(i != 5, get(1)["b${i}"])
+          }
+          for (i in 1..5) {
+            assertEquals(true, get(2)["b${i}"])
+          }
         }
       }
     }

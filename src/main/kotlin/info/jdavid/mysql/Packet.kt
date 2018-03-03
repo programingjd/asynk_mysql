@@ -272,7 +272,6 @@ sealed class Packet {
           /*val maxDigits =*/ buffer.get()
           /*val filler =*/ ByteArray(2).apply { buffer.get(this) }
           assert(start + length == buffer.position())
-          println("${name} -> ${Integer.toHexString(columnType.toInt() and 0xff)}")
           return ColumnDefinition(name, table, columnType, columnLength, unsigned, binary) as T
         }
         BinaryResultSet::class.java -> {

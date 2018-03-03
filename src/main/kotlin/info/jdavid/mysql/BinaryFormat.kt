@@ -1,5 +1,6 @@
 package info.jdavid.mysql
 
+import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.time.Instant
 import java.time.LocalDate
@@ -65,17 +66,17 @@ internal object BinaryFormat {
           }
           else {
             if (value !is Number) throw IllegalArgumentException()
-            value.toByte()
+            if (unsigned) (value.toInt() and 0xff).toByte() else value.toByte()
           }
         )
       }
       Types.SHORT -> {
         if (value !is Number) throw IllegalArgumentException()
-        buffer.putShort(value.toShort())
+        buffer.putShort(if (unsigned) (value.toInt() and 0xffff).toShort() else value.toShort())
       }
       Types.INT, Types.INT24 -> {
         if (value !is Number) throw IllegalArgumentException()
-        buffer.putInt(value.toInt())
+        buffer.putInt(if (unsigned) (value.toLong() and 0xffffffffL).toInt() else value.toInt())
       }
       Types.LONG -> {
         if (value !is Number) throw IllegalArgumentException()
@@ -148,9 +149,9 @@ internal object BinaryFormat {
         buffer.put(bytes)
       }
       Types.BLOB, Types.TINYBLOB, Types.MEDIUMBLOB, Types.LONGBLOB -> {
-        val bytes = when {
-          value is CharSequence -> value.toString().toByteArray(Charsets.UTF_8)
-          value is ByteArray -> value
+        val bytes = when(value) {
+          is CharSequence -> value.toString().toByteArray(Charsets.UTF_8)
+          is ByteArray -> value
           else -> throw IllegalArgumentException()
         }
         setLengthEncodedInteger(bytes.size, buffer)
@@ -164,10 +165,22 @@ internal object BinaryFormat {
   fun read(type: Byte, length: Int, unsigned: Boolean, binary: Boolean, buffer: ByteBuffer): Any? {
     return when (type) {
       Types.BIT -> if (length == 1) buffer.get() != 0.toByte() else Bitmap(length).set(buffer).bytes
-      Types.BYTE -> if (length == 1) buffer.get() != 0.toByte() else buffer.get()
-      Types.SHORT -> buffer.getShort()
-      Types.INT, Types.INT24 -> buffer.getInt()
-      Types.LONG -> buffer.getLong()
+      Types.BYTE -> when {
+        unsigned -> (buffer.get().toInt() and 0xff).toShort()
+        length == 1 -> buffer.get() != 0.toByte()
+        else -> buffer.get()
+      }
+      Types.SHORT -> if (unsigned) buffer.getShort().toInt() and 0xffff else buffer.getShort()
+      Types.INT, Types.INT24 -> if (unsigned) buffer.getInt().toLong() and 0xffffffffL else buffer.getInt()
+      Types.LONG -> if (unsigned) {
+        val value = buffer.getLong()
+        if (value >= 0L) BigInteger.valueOf(value)
+        else {
+          val upper = value.ushr(32) and 0xffffffffL
+          val lower = value.toInt().toLong() and 0xffffffffL
+          (BigInteger.valueOf(upper) shl 32).plus(BigInteger.valueOf(lower))
+        }
+      } else buffer.getLong()
       Types.FLOAT -> buffer.getFloat()
       Types.DOUBLE -> buffer.getDouble()
       Types.NUMERIC, Types.DECIMAL -> getLengthEncodedString(buffer).toBigDecimal()
