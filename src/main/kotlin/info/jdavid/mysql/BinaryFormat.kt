@@ -19,6 +19,7 @@ internal object BinaryFormat {
     when (type) {
       Types.BIT -> {
         if (length == 1) {
+          buffer.put(0x01.toByte())
           buffer.put(when(value) {
             is Boolean -> if (value == false) 0x00.toByte() else 0x01.toByte()
             is CharSequence -> when(value.toString().toLowerCase()) {
@@ -39,6 +40,7 @@ internal object BinaryFormat {
         }
         else {
           val n: Int = length + 7 / 8
+          buffer.put(n.toByte())
           buffer.put(when(value) {
             is BitSet -> {
               if (value.size() > n) throw IllegalArgumentException()
@@ -164,7 +166,10 @@ internal object BinaryFormat {
   @Suppress("UsePropertyAccessSyntax")
   fun read(type: Byte, length: Int, unsigned: Boolean, binary: Boolean, buffer: ByteBuffer): Any? {
     return when (type) {
-      Types.BIT -> if (length == 1) buffer.get() != 0.toByte() else Bitmap(length).set(buffer).bytes
+      Types.BIT -> {
+        val n = buffer.get().toInt()
+        if (length == 1 && n == 1) buffer.get() != 0.toByte() else Bitmap(length).set(buffer, n).bytes
+      }
       Types.BYTE -> when {
         unsigned -> (buffer.get().toInt() and 0xff).toShort()
         length == 1 -> buffer.get() != 0.toByte()

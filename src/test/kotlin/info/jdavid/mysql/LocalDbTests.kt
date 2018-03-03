@@ -246,11 +246,12 @@ class LocalDbTests {
           """.trimIndent()
         ).toList().apply {
           assertEquals(3, size)
+          println(this)
           for (i in 1..5) {
-            assertEquals(i == 4, get(0)["b${i}"])
+            assertEquals("b${i}", i != 4, get(0)["b${i}"])
           }
           for (i in 1..5) {
-            assertEquals(i != 5, get(1)["b${i}"])
+            assertEquals(i == 5, get(1)["b${i}"])
           }
           for (i in 1..5) {
             assertEquals(true, get(2)["b${i}"])

@@ -5,8 +5,8 @@ import java.nio.ByteBuffer
 internal class Bitmap(n: Int, val offset: Int = 0) {
   internal val bytes = ByteArray((n + 7 + offset) / 8)
 
-  fun set(buffer: ByteBuffer): Bitmap {
-    buffer.get(bytes)
+  fun set(buffer: ByteBuffer, length: Int = bytes.size): Bitmap {
+    buffer.get(bytes, 0, length)
     return this
   }
 

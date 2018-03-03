@@ -119,8 +119,14 @@ sealed class Packet {
       for (i in 0 until list.size) {
         if (list[i] != null) {
           val col = types[i]
-          buffer.put(col.type)
-          buffer.put(if (col.unsigned) 128.toByte() else 0.toByte())
+          if (!col.unsigned && list[i] is Boolean) {
+            buffer.put(Types.BYTE)
+            buffer.put(0.toByte())
+          }
+          else {
+            buffer.put(col.type)
+            buffer.put(if (col.unsigned) 128.toByte() else 0.toByte())
+          }
         }
       }
 //      buffer.put(0x00.toByte())
@@ -128,7 +134,12 @@ sealed class Packet {
         val value = list[i]
         if (value != null) {
           val col = types[i]
-          BinaryFormat.write(value, col.type, col.length, col.unsigned, buffer)
+          if (!col.unsigned && list[i] is Boolean) {
+            BinaryFormat.write(value, Types.BYTE, 1, false, buffer)
+          }
+          else {
+            BinaryFormat.write(value, col.type, col.length, col.unsigned, buffer)
+          }
         }
       }
       buffer.putInt(start, buffer.position() - start - 4)
