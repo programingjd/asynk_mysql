@@ -2,8 +2,13 @@ package info.jdavid.mysql
 
 import java.nio.ByteBuffer
 
-internal class Bitmap(n: Int, val offset: Int = 0) {
+internal class Bitmap(private val n: Int, val offset: Int = 0) {
   internal val bytes = ByteArray((n + 7 + offset) / 8)
+
+  fun set(bytes: ByteArray): Bitmap {
+    System.arraycopy(bytes, offset, this.bytes, 0, bytes.size)
+    return this
+  }
 
   fun set(buffer: ByteBuffer, length: Int = bytes.size): Bitmap {
     buffer.get(bytes, 0, length)
@@ -26,5 +31,7 @@ internal class Bitmap(n: Int, val offset: Int = 0) {
       bytes[i] = (bytes[i].toInt() and (1 shl j).inv()).toByte()
     }
   }
+
+  override fun toString() = (0 until n).map { if (get(it)) "1" else "0" }.joinToString("")
 
 }

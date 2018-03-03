@@ -22,7 +22,7 @@ class EnsemblTests {
       credentials.connectTo(databaseName, address).use {
         it.rows(
           """
-            SELECT * FROM gene ORDER BY gene_id LIMIT 1
+            SELECT gene_id FROM gene ORDER BY gene_id LIMIT 1
           """.trimIndent()
         ).toList().apply {
           Assert.assertEquals(1, size)

@@ -158,7 +158,9 @@ sealed class Packet {
   class AuthSwitchRequest(internal val sequenceId: Byte,
                           internal val scramble: ByteArray,
                           internal val auth: String?): FromServer, Packet() {
-    override fun toString() = "AuthSwitchRequest(${auth ?: "OK"})"
+    override fun toString(): String {
+      return "AuthSwitchRequest(${auth ?: "OK"})${if (auth == null) "{\n${String(scramble)}\n}" else ""}"
+    }
   }
 
   class StatementPrepareOK(internal val sequenceId: Byte,
