@@ -22,14 +22,18 @@ object MysqlAuthentication {
         if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
         val authResponse = nativePassword(credentials.password, handshake.scramble)
         connection.send(Packet.HandshakeResponse(database, credentials.username, authResponse, handshake))
-        val ok = connection.receive(Packet.OK::class.java)
-        assert (ok.sequenceId == 2.toByte())
+        val switch = connection.receive(Packet.AuthSwitchRequest::class.java)
+        assert(switch.sequenceId == 2.toByte())
+        if (switch.auth != null) {
+          throw Exception("Server requests unsupported authentication method: ${handshake.auth}")
+        }
       }
       else -> throw Exception("Unsupported authentication method: ${handshake.auth}")
     }
   }
 
   private fun nativePassword(password: String, salt: ByteArray): ByteArray {
+    if (password.isEmpty()) return ByteArray(0)
     val sha1 = MessageDigest.getInstance("SHA1")
     val s = sha1.digest(password.toByteArray())
     val ss = sha1.digest(s)

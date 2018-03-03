@@ -155,6 +155,12 @@ sealed class Packet {
     override fun toString() = "GenericOK(){\n${info}\n}"
   }
 
+  class AuthSwitchRequest(internal val sequenceId: Byte,
+                          internal val scramble: ByteArray,
+                          internal val auth: String?): FromServer, Packet() {
+    override fun toString() = "AuthSwitchRequest(${auth ?: "OK"})"
+  }
+
   class StatementPrepareOK(internal val sequenceId: Byte,
                            internal val statementId: Int,
                            internal val columnCount: Short,
@@ -217,6 +223,7 @@ sealed class Packet {
     internal fun <T: FromServer> fromBytes(buffer: ByteBuffer, expected: Class<T>?): T {
       val length = BinaryFormat.threeByteInteger(buffer)
       val sequenceId = buffer.get()
+      println("sequenceId: ${sequenceId}")
       if (length > buffer.remaining()) throw RuntimeException("Connection buffer too small.")
       val start = buffer.position()
       val first = buffer.get()
@@ -234,6 +241,27 @@ sealed class Packet {
         throw Exception("Error code: ${errorCode}, SQLState: ${sqlState}\n${message}")
       }
       return when (expected) {
+        AuthSwitchRequest::class.java -> {
+          assert(first == 0x00.toByte() || first == 0xfe.toByte())
+          if (first == 0x00.toByte()) {
+            /*val affectedRows =*/ BinaryFormat.getLengthEncodedInteger(buffer).toInt()
+            /*val lastInsertId =*/ BinaryFormat.getLengthEncodedInteger(buffer)
+            /*val status =*/ ByteArray(2).apply { buffer.get(this) }
+            /*val warningCount =*/ buffer.getShort()
+            val info = ByteArray(start + length - buffer.position()).apply {
+              buffer.get(this)
+            }
+            assert(start + length == buffer.position())
+            AuthSwitchRequest(sequenceId, info, null) as T
+          }
+          else {
+            val auth = BinaryFormat.getNullTerminatedString(buffer)
+            val scramble = ByteArray(start + length - buffer.position()).apply {
+              buffer.get(this)
+            }
+            AuthSwitchRequest(sequenceId, scramble, auth) as T
+          }
+        }
         OK::class.java -> {
           assert(first == 0x00.toByte() || first == 0xfe.toByte())
           val affectedRows = BinaryFormat.getLengthEncodedInteger(buffer).toInt()
