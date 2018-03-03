@@ -295,7 +295,7 @@ sealed class Packet {
             /*val lastInsertId =*/ BinaryFormat.getLengthEncodedInteger(buffer)
             /*val status =*/ ByteArray(2).apply { buffer.get(this) }
             /*val warningCount =*/ buffer.getShort()
-            val info = ByteArray(start + length - buffer.position()).let {
+            /*val info =*/ ByteArray(start + length - buffer.position()).let {
               buffer.get(it)
               String(it)
             }

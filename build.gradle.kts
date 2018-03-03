@@ -24,7 +24,7 @@ plugins {
 }
 
 group = "info.jdavid.mysql"
-version = "0.9.0.1"
+version = "1.0.0.0"
 
 repositories {
   jcenter()
