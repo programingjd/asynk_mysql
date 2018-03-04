@@ -36,11 +36,8 @@ internal object Capabilities {
 
   fun clientCapabilities() = CLIENT_MYSQL +
                              CONNECT_WITH_DB +
-                             //IGNORE_SPACE +
                              CLIENT_PROTOCOL_41 +
-                             //TRANSACTIONS +
                              SECURE_CONNECTION +
-                             PLUGIN_AUTH +
-                             CLIENT_DEPRECATE_EOF
+                             PLUGIN_AUTH
 
 }

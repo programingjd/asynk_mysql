@@ -278,7 +278,6 @@ sealed class Packet {
         }
         EOF::class.java -> {
           assert(first == 0xfe.toByte())
-          // CLIENT_DEPRECATE_EOF is set -> EOF is replaced with OK
           /* val warningCount =*/ buffer.getShort()
           /*val status =*/ ByteArray(2).apply { buffer.get(this) }
           assert(start + length == buffer.position())
@@ -319,22 +318,17 @@ sealed class Packet {
           return BinaryResultSet(first.toInt()) as T
         }
         Row::class.java -> {
-          if (first == 0xfe.toByte()) {
-            /*val affectedRows =*/ BinaryFormat.getLengthEncodedInteger(buffer)
-            /*val lastInsertId =*/ BinaryFormat.getLengthEncodedInteger(buffer)
-            /*val status =*/ ByteArray(2).apply { buffer.get(this) }
-            /*val warningCount =*/ buffer.getShort()
-            /*val info =*/ ByteArray(start + length - buffer.position()).let {
+          return if (first == 0xfe.toByte()) {
+            // could be OK or EOF depending on DEPRECATE_EOF flag
+            ByteArray(start + length - buffer.position()).let {
               buffer.get(it)
-              String(it)
             }
-            assert(start + length == buffer.position())
-            return Row(null) as T
+            Row(null) as T
           }
           else {
             assert(first == 0x00.toByte())
             val bytes = ByteArray(start + length - buffer.position()).apply { buffer.get(this) }
-            return Row(bytes) as T
+            Row(bytes) as T
           }
         }
         Handshake::class.java -> {

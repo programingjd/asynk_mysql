@@ -67,6 +67,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     for (i in 0 until n) {
       cols.add(receive(Packet.ColumnDefinition::class.java))
     }
+    receive(Packet.EOF::class.java)
     val channel = Channel<Map<String, Any?>>()
     launch(EmptyCoroutineContext) {
       while (true) {
@@ -95,12 +96,18 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     send(Packet.StatementPrepare(sqlStatement))
     val prepareOK = receive(Packet.StatementPrepareOK::class.java)
     val types = (1..prepareOK.paramCount).map { receive(Packet.ColumnDefinition::class.java) }
+    if (prepareOK.paramCount > 0) receive(Packet.EOF::class.java)
     /*val cols =*/ (1..prepareOK.columnCount).map { receive(Packet.ColumnDefinition::class.java) }
+    if (prepareOK.columnCount > 0) receive(Packet.EOF::class.java)
     return MysqlPreparedStatement(prepareOK.statementId, types, temporary)
   }
 
   internal suspend fun send(packet: Packet.FromClient) {
-    assert(buffer.limit() == buffer.position())
+    if (buffer.limit() != buffer.position()) {
+      val eof = receive(Packet.EOF::class.java)
+      println(eof)
+      assert(buffer.limit() == buffer.position())
+    }
     packet.writeTo(buffer.clear() as ByteBuffer)
     channel.aWrite(buffer.flip() as ByteBuffer, 5000L, TimeUnit.MILLISECONDS)
     buffer.clear().flip()
