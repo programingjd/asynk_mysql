@@ -2,7 +2,7 @@ package info.jdavid.mysql
 
 import info.jdavid.sql.use
 import kotlinx.coroutines.experimental.runBlocking
-import org.junit.Assert
+import org.junit.Assert.*
 import org.junit.Test
 import java.net.InetSocketAddress
 
@@ -22,10 +22,47 @@ class EnsemblTests {
       credentials.connectTo(databaseName, address).use {
         it.rows(
           """
-            SELECT gene_id FROM gene ORDER BY gene_id LIMIT 1
+            SELECT
+              gene_id,
+              biotype,
+              analysis_id,
+              seq_region_strand,
+              description,
+              is_current
+            FROM gene ORDER BY gene_id LIMIT 10
           """.trimIndent()
         ).toList().apply {
-          Assert.assertEquals(1, size)
+          assertEquals(10, size)
+
+          for (i in 1..10) {
+            assertEquals(i.toLong(), get(i-1)["gene_id"])
+            assertEquals("protein_coding", get(i-1)["biotype"])
+            assertEquals(1, get(i-1)["analysis_id"])
+            assertEquals(true, get(i-1)["is_current"])
+          }
+
+          assertEquals(1.toByte(), get(0)["seq_region_strand"])
+          assertEquals(1.toByte(), get(1)["seq_region_strand"])
+          assertEquals(1.toByte(), get(2)["seq_region_strand"])
+          assertEquals(1.toByte(), get(3)["seq_region_strand"])
+          assertEquals(1.toByte(), get(4)["seq_region_strand"])
+          assertEquals(1.toByte(), get(5)["seq_region_strand"])
+          assertEquals((-1).toByte(), get(6)["seq_region_strand"])
+          assertEquals(1.toByte(), get(7)["seq_region_strand"])
+          assertEquals((-1).toByte(), get(8)["seq_region_strand"])
+          assertEquals((-1).toByte(), get(9)["seq_region_strand"])
+
+          assertEquals("low molecular weight protein-tyrosine-phosphatase", get(0)["description"])
+          assertEquals("conserved hypothetical protein", get(1)["description"])
+          assertEquals("phosphatidylserine decarboxylase", get(2)["description"])
+          assertEquals("60S ribosomal protein L23", get(3)["description"])
+          assertEquals("heat shock protein", get(4)["description"])
+          assertEquals("organic cation transporter", get(5)["description"])
+          assertEquals("lava lamp protein", get(6)["description"])
+          assertEquals("hypothetical protein", get(7)["description"])
+          assertEquals("lkb1 interacting protein", get(8)["description"])
+          assertEquals("NADH:ubiquinone dehydrogenase, putative", get(9)["description"])
+
         }
       }
     }
@@ -50,7 +87,7 @@ class EnsemblTests {
             FROM compara_aaeg_aaeg_paralogs__paralogs__main LIMIT 5
           """.trimIndent()
         ).toList().apply {
-          Assert.assertEquals(5, size)
+          assertEquals(5, size)
         }
       }
     }
