@@ -53,11 +53,28 @@ object MysqlAuthentication {
                               internal val password: String = ""): Credentials(username)
 
     override suspend fun connectTo(database: String) = connectTo(
-      database, InetSocketAddress(InetAddress.getLoopbackAddress(), 3306)
+      database, InetSocketAddress(InetAddress.getLoopbackAddress(), 3306), 4194304
     )
 
-    override suspend fun connectTo(database: String, address: SocketAddress): MysqlConnection {
-      return MysqlConnection.to(database, this, address)
+    override suspend fun connectTo(database: String, bufferSize: Int) = connectTo(
+      database, InetSocketAddress(InetAddress.getLoopbackAddress(), 3306), bufferSize
+    )
+
+    override suspend fun connectTo(database: String, address: InetAddress) = connectTo(
+      database, InetSocketAddress(address, 3306), 4194304
+    )
+
+    override suspend fun connectTo(database: String, address: InetAddress, bufferSize: Int) = connectTo(
+      database, InetSocketAddress(address, 3306), bufferSize
+    )
+
+    override suspend fun connectTo(database: String, address: SocketAddress) = connectTo(
+      database, address, 4194304
+    )
+
+    override suspend fun connectTo(database: String, address: SocketAddress,
+                                   bufferSize: Int): MysqlConnection {
+      return MysqlConnection.to(database, this, address, bufferSize)
     }
 
   }

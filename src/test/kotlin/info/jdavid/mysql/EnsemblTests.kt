@@ -13,11 +13,11 @@ class EnsemblTests {
 
   private val credentials =
     MysqlAuthentication.Credentials.PasswordCredentials("anonymous", "")
-  private val databaseName = "aedes_aegypti_core_48_1b"
 
   @Test
   fun testMysql() {
     val address = InetSocketAddress("ensembldb.ensembl.org", 3306)
+    val databaseName = "aedes_aegypti_core_48_1b"
     runBlocking {
       credentials.connectTo(databaseName, address).use {
         it.rows(
@@ -34,11 +34,12 @@ class EnsemblTests {
   @Test
   fun testMariadb() {
     val address = InetSocketAddress("martdb.ensembl.org", 5316)
+    val databaseName = "compara_mart_homology_48"
     runBlocking {
-      credentials.connectTo(databaseName, address).use {
+      credentials.connectTo(databaseName, address, 16*1024).use {
         it.rows(
           """
-            SELECT * FROM gene ORDER BY id LIMIT 5
+            SELECT * FROM compara_mart_homology_48.compara_aaeg_aaeg_paralogs__paralogs__main LIMIT 1
           """.trimIndent()
         ).toList().apply {
           Assert.assertEquals(5, size)

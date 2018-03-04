@@ -153,12 +153,13 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     suspend fun to(
       database: String,
       credentials: MysqlAuthentication.Credentials = MysqlAuthentication.Credentials.UnsecuredCredentials(),
-      address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 5432)
+      address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 5432),
+      bufferSize: Int = 4194304 // needs to hold any RowData message
     ): MysqlConnection {
       val channel = AsynchronousSocketChannel.open()
       try {
         channel.aConnect(address)
-        val buffer = ByteBuffer.allocateDirect(4194304)// needs to hold any RowData message
+        val buffer = ByteBuffer.allocateDirect(bufferSize)
         buffer.order(ByteOrder.LITTLE_ENDIAN).flip()
         val connection = MysqlConnection(channel, buffer)
         MysqlAuthentication.authenticate(connection, database, credentials)
