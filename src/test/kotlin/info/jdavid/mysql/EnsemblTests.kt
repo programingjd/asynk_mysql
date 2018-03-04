@@ -36,10 +36,18 @@ class EnsemblTests {
     val address = InetSocketAddress("martdb.ensembl.org", 5316)
     val databaseName = "compara_mart_homology_48"
     runBlocking {
-      credentials.connectTo(databaseName, address, 16*1024).use {
+      credentials.connectTo(databaseName, address, 16777215).use {
         it.rows(
           """
-            SELECT * FROM compara_mart_homology_48.compara_aaeg_aaeg_paralogs__paralogs__main LIMIT 1
+            SELECT
+              homol_description,
+              aaeg1_transcript_id_key,
+              aaeg1_description,
+              aaeg1_gene_id,
+              aaeg1_gene_stable_id_v,
+              aaeg1_chrom_strand,
+              dn_ds
+            FROM compara_aaeg_aaeg_paralogs__paralogs__main LIMIT 5
           """.trimIndent()
         ).toList().apply {
           Assert.assertEquals(5, size)

@@ -156,6 +156,10 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 5432),
       bufferSize: Int = 4194304 // needs to hold any RowData message
     ): MysqlConnection {
+      if (bufferSize < 1024) throw IllegalArgumentException(
+        "Buffer size ${bufferSize} is smaller than the minimum buffer size of 1024")
+      if (bufferSize > 16777215) throw IllegalArgumentException(
+        "Buffer size ${bufferSize} is greater than the maximum buffer size of 16777215")
       val channel = AsynchronousSocketChannel.open()
       try {
         channel.aConnect(address)
