@@ -166,6 +166,58 @@ class LocalDbTests {
   }
 
   @Test
+  fun testNull() {
+    runBlocking {
+      credentials.connectTo(databaseName).use {
+        assertEquals(0, it.affectedRows(
+          """
+            CREATE TEMPORARY TABLE test (
+              id             serial    PRIMARY KEY,
+              i1             integer,
+              s1             text DEFAULT NULL,
+              b1             boolean
+            )
+          """.trimIndent()
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (i1, s1, b1) VALUES (?, ?, ?)
+          """.trimIndent(),
+          listOf(1234, null, true)
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (i1, b1) VALUES (?, ?)
+          """.trimIndent(),
+          listOf(null, false)
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (i1, b1) VALUES (?, ?)
+          """.trimIndent(),
+          listOf(null, null)
+        ))
+        it.rows(
+          """
+            SELECT * FROM test ORDER BY id
+          """.trimIndent()
+        ).toList().apply {
+          assertEquals(3, size)
+          assertEquals(1234, get(0)["i1"])
+          assertNull(get(0)["s1"])
+          assertEquals(true, get(0)["b1"])
+          assertNull(get(1)["i1"])
+          assertNull(get(1)["s1"])
+          assertEquals(false,get(1)["b1"])
+          assertNull(get(2)["i1"])
+          assertNull(get(2)["s1"])
+          assertNull(get(2)["b1"])
+        }
+      }
+    }
+  }
+
+  @Test
   fun testUnsigned() {
     runBlocking {
       credentials.connectTo(databaseName).use {
@@ -204,7 +256,6 @@ class LocalDbTests {
       }
     }
   }
-
 
   @Test
   fun testBoolean() {
@@ -246,7 +297,6 @@ class LocalDbTests {
           """.trimIndent()
         ).toList().apply {
           assertEquals(3, size)
-          println(this)
           for (i in 1..5) {
             assertEquals("b${i}", i != 4, get(0)["b${i}"])
           }
@@ -256,6 +306,107 @@ class LocalDbTests {
           for (i in 1..5) {
             assertEquals(true, get(2)["b${i}"])
           }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun testEnum() {
+    runBlocking {
+      credentials.connectTo(databaseName).use {
+        assertEquals(0, it.affectedRows(
+          """
+            CREATE TEMPORARY TABLE test (
+              id             serial    PRIMARY KEY,
+              set1           set('a','b','c'),
+              enum1          enum('a','b','c','d')
+            )
+          """.trimIndent()
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (set1, enum1) VALUES (?, ?)
+          """.trimIndent(),
+          listOf("a,b", "a")
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (set1, enum1) VALUES (?, ?)
+          """.trimIndent(),
+          listOf("c", "")
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (set1, enum1) VALUES (?, ?)
+          """.trimIndent(),
+          listOf(null, null)
+        ))
+        it.rows(
+          """
+            SELECT * FROM test ORDER BY id
+          """.trimIndent()
+        ).toList().apply {
+          println(this)
+          assertEquals(3, size)
+          assertEquals("a,b", get(0)["set1"])
+          assertEquals("a", get(0)["enum1"])
+          assertEquals("c", get(1)["set1"])
+          assertEquals("", get(1)["enum1"])
+          assertNull(get(2)["set1"])
+          assertNull(get(2)["enum1"])
+        }
+      }
+    }
+  }
+
+  @Test
+  fun testSet() {
+    runBlocking {
+      credentials.connectTo(databaseName).use {
+        assertEquals(0, it.affectedRows(
+          """
+            CREATE TEMPORARY TABLE test (
+              id             serial    PRIMARY KEY,
+              set1           SET('a', 'b', 'c')
+            )
+          """.trimIndent()
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (set1) VALUES (?)
+          """.trimIndent(),
+          listOf("a,b")
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (set1) VALUES (?)
+          """.trimIndent(),
+          listOf("c")
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (set1) VALUES (?)
+          """.trimIndent(),
+          listOf("")
+        ))
+//        assertEquals(1, it.affectedRows(
+//          """
+//            INSERT INTO test (set1) VALUES (?)
+//          """.trimIndent(),
+//          listOf(null)
+//        ))
+        it.rows(
+          """
+            SELECT * FROM test ORDER BY id
+          """.trimIndent()
+        ).toList().apply {
+          println(this)
+//          assertEquals(4, size)
+          assertEquals("a,b", get(0)["set1"])
+          assertEquals("c", get(1)["set1"])
+          assertEquals("", get(2)["set1"])
+//          assertNull(get(3)["set1"])
         }
       }
     }

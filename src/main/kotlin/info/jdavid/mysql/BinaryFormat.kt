@@ -150,7 +150,7 @@ internal object BinaryFormat {
         setLengthEncodedInteger(bytes.size, buffer)
         buffer.put(bytes)
       }
-      Types.BLOB, Types.TINYBLOB, Types.MEDIUMBLOB, Types.LONGBLOB -> {
+      Types.ENUM, Types.SET, Types.BLOB, Types.TINYBLOB, Types.MEDIUMBLOB, Types.LONGBLOB -> {
         val bytes = when(value) {
           is CharSequence -> value.toString().toByteArray(Charsets.UTF_8)
           is ByteArray -> value
@@ -209,7 +209,7 @@ internal object BinaryFormat {
         val day = buffer.get().toInt()
         date(LocalDate.of(year, month, day))
       }
-      Types.VARCHAR, Types.VARSTRING, Types.STRING -> getLengthEncodedString(buffer)
+      Types.VARCHAR, Types.VARSTRING, Types.STRING, Types.ENUM, Types.SET -> getLengthEncodedString(buffer)
       Types.BLOB, Types.TINYBLOB, Types.MEDIUMBLOB, Types.LONGBLOB -> {
         if (binary) getLengthEncodedBlob(buffer) else getLengthEncodedString(buffer)
       }
