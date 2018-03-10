@@ -84,10 +84,47 @@ class EnsemblTests {
               aaeg1_gene_stable_id_v,
               aaeg1_chrom_strand,
               dn_ds
-            FROM compara_aaeg_aaeg_paralogs__paralogs__main LIMIT 5
+            FROM compara_aaeg_aaeg_paralogs__paralogs__main
+            ORDER BY aaeg1_gene_id, aaeg1_cigar_line LIMIT 1000
           """.trimIndent()
         ).toList().apply {
-          assertEquals(5, size)
+          assertEquals(1000, size)
+
+          for (i in 0..9) {
+            assertEquals("within_species_paralog", get(i)["homol_description"])
+          }
+          for (i in 0..1) {
+            assertEquals(1, get(i)["aaeg1_transcript_id_key"])
+            assertEquals(1.toLong(), get(i)["aaeg1_gene_id"])
+            assertEquals(1.toByte(), get(i)["aaeg1_chrom_strand"])
+            assertEquals("low molecular weight protein-tyrosine-phosphatase", get(i)["aaeg1_description"])
+            assertNull(get(i)["dn_ds"])
+            assertEquals("AAEL003237.1", get(i)["aaeg1_gene_stable_id_v"])
+          }
+          for (i in 2..3) {
+            assertEquals(2, get(i)["aaeg1_transcript_id_key"])
+            assertEquals(2.toLong(), get(i)["aaeg1_gene_id"])
+            assertEquals(1.toByte(), get(i)["aaeg1_chrom_strand"])
+            assertEquals("conserved hypothetical protein", get(i)["aaeg1_description"])
+            assertNull(get(i)["dn_ds"])
+            assertEquals("AAEL014602.1", get(i)["aaeg1_gene_stable_id_v"])
+          }
+          for (i in 4..5) {
+            assertEquals(4, get(i)["aaeg1_transcript_id_key"])
+            assertEquals(4.toLong(), get(i)["aaeg1_gene_id"])
+            assertEquals(1.toByte(), get(i)["aaeg1_chrom_strand"])
+            assertEquals("60S ribosomal protein L23", get(i)["aaeg1_description"])
+            assertNull(get(i)["dn_ds"])
+            assertEquals("AAEL013583.1", get(i)["aaeg1_gene_stable_id_v"])
+          }
+          for (i in 6..9) {
+            assertEquals(5, get(i)["aaeg1_transcript_id_key"])
+            assertEquals(5.toLong(), get(i)["aaeg1_gene_id"])
+            assertEquals(1.toByte(), get(i)["aaeg1_chrom_strand"])
+            assertEquals("heat shock protein", get(i)["aaeg1_description"])
+            assertNull(get(i)["dn_ds"])
+            assertEquals("AAEL011704.1", get(i)["aaeg1_gene_stable_id_v"])
+          }
         }
       }
     }
