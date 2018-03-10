@@ -114,14 +114,19 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
   }
 
   internal suspend fun <T: Packet.FromServer> receive(type: Class<T>): T {
-    if (buffer.remaining() > 0) return Packet.fromBytes(buffer, type)
+    if (buffer.remaining() > 0) {
+      if (buffer.remaining() > 4) {
+        val packet = Packet.fromBytes(buffer, type)
+        if (packet != null) return packet
+      }
+    }
     buffer.compact()
     val left = buffer.capacity() - buffer.position()
     val n = channel.aRead(buffer, 5000L, TimeUnit.MILLISECONDS)
     if (n == left) throw RuntimeException("Connection buffer too small.")
     buffer.flip()
     try {
-      return Packet.fromBytes(buffer, type)
+      return Packet.fromBytes(buffer, type) ?: throw RuntimeException("Connection buffer too small.")
     }
     catch (e: Packet.Exception) {
       if (e.message != null) err(e.message)

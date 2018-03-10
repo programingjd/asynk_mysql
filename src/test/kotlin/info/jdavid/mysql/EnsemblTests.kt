@@ -29,10 +29,10 @@ class EnsemblTests {
               seq_region_strand,
               description,
               is_current
-            FROM gene ORDER BY gene_id LIMIT 10
+            FROM gene ORDER BY gene_id LIMIT 1000
           """.trimIndent()
         ).toList().apply {
-          assertEquals(10, size)
+          assertEquals(1000, size)
 
           for (i in 1..10) {
             assertEquals(i.toLong(), get(i-1)["gene_id"])

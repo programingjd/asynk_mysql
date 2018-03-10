@@ -222,11 +222,14 @@ sealed class Packet {
   companion object {
 
     @Suppress("UsePropertyAccessSyntax", "UNCHECKED_CAST")
-    internal fun <T: FromServer> fromBytes(buffer: ByteBuffer, expected: Class<T>?): T {
+    internal fun <T: FromServer> fromBytes(buffer: ByteBuffer, expected: Class<T>?): T? {
       val length = BinaryFormat.threeByteInteger(buffer)
       val sequenceId = buffer.get()
-      if (length > buffer.remaining()) throw RuntimeException("Connection buffer too small.")
       val start = buffer.position()
+      if (length > buffer.remaining()) {
+        buffer.position(start - 4)
+        return null
+      }
       val first = buffer.get()
       if (first == 0xff.toByte()) {
         val errorCode = buffer.getShort()

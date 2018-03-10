@@ -246,13 +246,13 @@ internal object BinaryFormat {
   }
 
   fun getLengthEncodedInteger(buffer: ByteBuffer): Long {
-    val first = buffer.get()
+    val first = buffer.get().toInt() and 0xff
     @Suppress("UsePropertyAccessSyntax")
     return when (first) {
-      0xff.toByte() -> throw RuntimeException()
-      0xfe.toByte() -> buffer.getLong()
-      0xfd.toByte() -> threeByteInteger(buffer).toLong()
-      0xfc.toByte() -> buffer.getInt().toLong()
+      0xff -> throw RuntimeException()
+      0xfe -> buffer.getLong()
+      0xfd -> threeByteInteger(buffer).toLong()
+      0xfc -> buffer.getInt().toLong()
       else -> first.toLong()
     }
   }
