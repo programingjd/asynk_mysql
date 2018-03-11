@@ -174,7 +174,7 @@ class LocalDbTests {
             CREATE TEMPORARY TABLE test (
               id             serial    PRIMARY KEY,
               i1             integer,
-              s1             text DEFAULT NULL,
+              s1             text      DEFAULT NULL,
               b1             boolean
             )
           """.trimIndent()
