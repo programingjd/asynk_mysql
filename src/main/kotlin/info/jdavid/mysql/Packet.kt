@@ -128,6 +128,10 @@ sealed class Packet {
             buffer.put(if (col.unsigned) 128.toByte() else 0.toByte())
           }
         }
+        else {
+          buffer.put(Types.NULL)
+          buffer.put(0.toByte())
+        }
       }
 //      buffer.put(0x00.toByte())
       for (i in 0 until list.size) {

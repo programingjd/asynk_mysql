@@ -5,7 +5,7 @@ internal object Types {
   val FLOAT = 0x04.toByte()
   val DOUBLE = 0x05.toByte()
 
-//  val NULL = 0x06.toByte()
+  val NULL = 0x06.toByte()
 
   val BYTE = 0x01.toByte()      //  TINYINT
   val SHORT = 0x02.toByte()     //  SMALLINT
