@@ -340,7 +340,6 @@ class LocalDbTests {
             SELECT * FROM test ORDER BY id
           """.trimIndent()
         ).toList().apply {
-          println(this)
           assertEquals(2, size)
           assertEquals("a", get(0)["enum1"])
           assertNull(get(1)["enum1"])
