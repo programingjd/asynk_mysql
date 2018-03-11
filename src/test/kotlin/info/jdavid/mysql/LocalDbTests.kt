@@ -319,28 +319,21 @@ class LocalDbTests {
           """
             CREATE TEMPORARY TABLE test (
               id             serial    PRIMARY KEY,
-              set1           set('a','b','c'),
               enum1          enum('a','b','c','d')
             )
           """.trimIndent()
         ))
         assertEquals(1, it.affectedRows(
           """
-            INSERT INTO test (set1, enum1) VALUES (?, ?)
+            INSERT INTO test (enum1) VALUES (?)
           """.trimIndent(),
-          listOf("a,b", "a")
+          listOf("a")
         ))
         assertEquals(1, it.affectedRows(
           """
-            INSERT INTO test (set1, enum1) VALUES (?, ?)
+            INSERT INTO test (enum1) VALUES (?)
           """.trimIndent(),
-          listOf("c", "")
-        ))
-        assertEquals(1, it.affectedRows(
-          """
-            INSERT INTO test (set1, enum1) VALUES (?, ?)
-          """.trimIndent(),
-          listOf(null, null)
+          listOf(null)
         ))
         it.rows(
           """
@@ -348,13 +341,9 @@ class LocalDbTests {
           """.trimIndent()
         ).toList().apply {
           println(this)
-          assertEquals(3, size)
-          assertEquals("a,b", get(0)["set1"])
+          assertEquals(2, size)
           assertEquals("a", get(0)["enum1"])
-          assertEquals("c", get(1)["set1"])
-          assertEquals("", get(1)["enum1"])
-          assertNull(get(2)["set1"])
-          assertNull(get(2)["enum1"])
+          assertNull(get(1)["enum1"])
         }
       }
     }
