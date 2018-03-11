@@ -390,23 +390,22 @@ class LocalDbTests {
           """.trimIndent(),
           listOf("")
         ))
-//        assertEquals(1, it.affectedRows(
-//          """
-//            INSERT INTO test (set1) VALUES (?)
-//          """.trimIndent(),
-//          listOf(null)
-//        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (set1) VALUES (?)
+          """.trimIndent(),
+          listOf(null)
+        ))
         it.rows(
           """
             SELECT * FROM test ORDER BY id
           """.trimIndent()
         ).toList().apply {
-          println(this)
-//          assertEquals(4, size)
+          assertEquals(4, size)
           assertEquals("a,b", get(0)["set1"])
           assertEquals("c", get(1)["set1"])
           assertEquals("", get(2)["set1"])
-//          assertNull(get(3)["set1"])
+          assertNull(get(3)["set1"])
         }
       }
     }
