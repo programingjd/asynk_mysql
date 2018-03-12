@@ -16,6 +16,8 @@ import java.nio.ByteOrder
 import java.nio.channels.AsynchronousSocketChannel
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.experimental.EmptyCoroutineContext
+import kotlin.coroutines.experimental.coroutineContext
+
 typealias PreparedStatement= Connection.PreparedStatement<MysqlConnection>
 
 
@@ -69,7 +71,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     }
     receive(Packet.EOF::class.java)
     val channel = Channel<Map<String, Any?>>()
-    launch(EmptyCoroutineContext) {
+    launch(coroutineContext + EmptyCoroutineContext) {
       while (true) {
         val row = receive(Packet.Row::class.java)
         if (row.bytes == null) break
