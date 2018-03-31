@@ -1,4 +1,4 @@
-![jcenter](https://img.shields.io/badge/_jcenter_-1.0.0.4-6688ff.png?style=flat) &#x2003; ![jcenter](https://img.shields.io/badge/_Tests_-1/1-green.png?style=flat)
+![jcenter](https://img.shields.io/badge/_jcenter_-1.0.1.0-6688ff.png?style=flat) &#x2003; ![jcenter](https://img.shields.io/badge/_Tests_-15/15-green.png?style=flat)
 # mysql
 A Mysql/Mariadb async client with suspend functions for kotlin coroutines.
 
@@ -7,7 +7,7 @@ A Mysql/Mariadb async client with suspend functions for kotlin coroutines.
 The maven artifacts are on [Bintray](https://bintray.com/programingjd/maven/info.jdavid.mysql/view)
 and [jcenter](https://bintray.com/search?query=info.jdavid.mysql).
 
-[Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/mysql/mysql/1.0.0.4/mysql-1.0.0.4.jar) the latest jar.
+[Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/mysql/mysql/1.0.1.0/mysql-1.0.1.0.jar) the latest jar.
 
 __Maven__
 
@@ -17,7 +17,7 @@ Include [those settings](https://bintray.com/repo/downloadMavenRepoSettingsFile/
 <dependency>
   <groupId>info.jdavid.mysql</groupId>
   <artifactId>mysql</artifactId>
-  <version>1.0.0.4</version>
+  <version>1.0.1.0</version>
 </dependency>
 ```
 __Gradle__
@@ -30,6 +30,6 @@ repositories {
 ```
 ```
 dependencies {
-  compile 'info.jdavid.mysql:mysql:1.0.0.4'
+  compile 'info.jdavid.mysql:mysql:1.0.1.0'
 }
 ```

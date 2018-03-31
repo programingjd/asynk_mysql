@@ -286,7 +286,9 @@ sealed class Packet {
           val affectedRows = BinaryFormat.getLengthEncodedInteger(buffer).toInt()
           /*val lastInsertId =*/ BinaryFormat.getLengthEncodedInteger(buffer)
           /*val status =*/ ByteArray(2).apply { buffer.get(this) }
-          /*val warningCount =*/ buffer.getShort()
+          if (start + length - buffer.position() > 0) {
+            /*val warningCount =*/ buffer.getShort()
+          }
           val info = ByteArray(start + length - buffer.position()).let {
             buffer.get(it)
             String(it)
