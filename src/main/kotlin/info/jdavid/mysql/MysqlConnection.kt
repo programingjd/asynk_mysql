@@ -33,6 +33,21 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     }
   }
 
+  override suspend fun commitTransaction() {
+    send(Packet.Query("COMMIT"))
+    receive(Packet.OK::class.java)
+  }
+
+  override suspend fun rollbackTransaction() {
+    send(Packet.Query("ROLLBACK"))
+    receive(Packet.OK::class.java)
+  }
+
+  override suspend fun startTransaction() {
+    send(Packet.Query("START TRANSACTION"))
+    receive(Packet.OK::class.java)
+  }
+
   override suspend fun affectedRows(sqlStatement: String) = affectedRows(sqlStatement, emptyList())
 
   override suspend fun affectedRows(sqlStatement: String, params: Iterable<Any?>): Int {

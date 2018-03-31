@@ -1,4 +1,4 @@
-![jcenter](https://img.shields.io/badge/_jcenter_-1.0.0.4-6688ff.png?style=flat) &#x2003; ![jcenter](https://img.shields.io/badge/_Tests_-13/13-green.png?style=flat)
+![jcenter](https://img.shields.io/badge/_jcenter_-1.0.0.4-6688ff.png?style=flat) &#x2003; ![jcenter](https://img.shields.io/badge/_Tests_-1/1-green.png?style=flat)
 # mysql
 A Mysql/Mariadb async client with suspend functions for kotlin coroutines.
 

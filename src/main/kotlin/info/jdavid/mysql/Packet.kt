@@ -10,6 +10,17 @@ sealed class Packet {
     fun writeTo(buffer: ByteBuffer)
   }
 
+  class Query(val query: String): FromClient, Packet() {
+    override fun toString() = "Query(${query})"
+    override fun writeTo(buffer: ByteBuffer) {
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put(0x03)
+      buffer.put(query.toByteArray())
+      buffer.putInt(start, buffer.position() - start - 4)
+    }
+  }
+
   class Quit: FromClient, Packet() {
     override fun toString() = "Quit()"
     override fun writeTo(buffer: ByteBuffer) {
