@@ -1,4 +1,5 @@
 DROP TABLE IF EXISTS countrylanguage,city,country;
+
 CREATE TABLE city (
   ID SERIAL NOT NULL,
   Name TEXT NOT NULL,
@@ -5339,5 +5340,6 @@ INSERT INTO countrylanguage VALUES ('ZWE','English',TRUE,2.2);
 INSERT INTO countrylanguage VALUES ('ZWE','Ndebele',FALSE,16.2);
 INSERT INTO countrylanguage VALUES ('ZWE','Nyanja',FALSE,2.2);
 INSERT INTO countrylanguage VALUES ('ZWE','Shona',FALSE,72.1);
+
 ALTER TABLE city ADD FOREIGN KEY (CountryCode) REFERENCES country (Code);
 ALTER TABLE countrylanguage ADD FOREIGN KEY (CountryCode) REFERENCES country (Code);
