@@ -98,7 +98,7 @@ bintray {
   setPublications("mavenJava")
   pkg(delegateClosureOf<BintrayExtension.PackageConfig>{
     repo = "maven"
-    name = "${project.group}"
+    name = "${project.group}.${project.name}"
     websiteUrl = "https://github.com/programingjd/asynk_mysql"
     issueTrackerUrl = "https://github.com/programingjd/asynk_mysql/issues"
     vcsUrl = "https://github.com/programingjd/asynk_mysql.git"
