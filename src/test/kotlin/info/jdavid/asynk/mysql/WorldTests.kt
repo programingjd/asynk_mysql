@@ -1,6 +1,6 @@
-package info.jdavid.mysql
+package info.jdavid.asynk.mysql
 
-import info.jdavid.sql.use
+import info.jdavid.asynk.sql.use
 import kotlinx.coroutines.experimental.runBlocking
 import org.junit.After
 import org.junit.Test
@@ -18,6 +18,13 @@ class WorldTests {
     val password = properties.getProperty("mysql_password") ?: ""
     credentials = MysqlAuthentication.Credentials.PasswordCredentials(username, password)
     databaseName = properties.getProperty("mysql_database") ?: "mysql"
+  }
+
+  companion object {
+    @JvmStatic
+    fun main(args: Array<String>) {
+      WorldTests().createTables()
+    }
   }
 
   @Before

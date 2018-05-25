@@ -1,10 +1,10 @@
-package info.jdavid.mysql
+package info.jdavid.asynk.mysql
 
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.SocketAddress
 import java.security.MessageDigest
-typealias MysqlCredentials=info.jdavid.sql.Credentials<MysqlConnection>
+typealias MysqlCredentials=info.jdavid.asynk.sql.Credentials<MysqlConnection>
 
 object MysqlAuthentication {
 

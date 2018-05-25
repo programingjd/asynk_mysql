@@ -1,8 +1,8 @@
-package info.jdavid.mysql
+package info.jdavid.asynk.mysql
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
-import info.jdavid.sql.use
+import info.jdavid.asynk.sql.use
 import kotlinx.coroutines.experimental.runBlocking
 
 fun json(any: Any?) = ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT).writeValueAsString(any)

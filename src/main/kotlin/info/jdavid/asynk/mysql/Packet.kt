@@ -1,4 +1,4 @@
-package info.jdavid.mysql
+package info.jdavid.asynk.mysql
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

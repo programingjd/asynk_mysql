@@ -1,6 +1,6 @@
-package info.jdavid.mysql
+package info.jdavid.asynk.mysql
 
-import info.jdavid.sql.Connection
+import info.jdavid.asynk.sql.Connection
 import kotlinx.coroutines.experimental.channels.Channel
 import kotlinx.coroutines.experimental.channels.toList
 import kotlinx.coroutines.experimental.launch
