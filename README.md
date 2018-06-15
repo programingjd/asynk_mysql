@@ -17,7 +17,7 @@ Include [those settings](https://bintray.com/repo/downloadMavenRepoSettingsFile/
 <dependency>
   <groupId>info.jdavid.asynk.mysql</groupId>
   <artifactId>mysql</artifactId>
-  <version>1.0.2.1</version>
+  <version>0.0.0.2</version>
 </dependency>
 ```
 __Gradle__
@@ -30,6 +30,6 @@ repositories {
 ```
 ```
 dependencies {
-  compile 'info.jdavid.asynk.mysql:mysql:1.0.2.1'
+  compile 'info.jdavid.asynk.mysql:mysql:0.0.0.2'
 }
 ```
