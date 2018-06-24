@@ -1,7 +1,7 @@
 package info.jdavid.asynk.mysql
 
-import org.junit.Assert.*
-import org.junit.Test
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 

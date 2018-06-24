@@ -24,7 +24,7 @@ plugins {
 }
 
 group = "info.jdavid.asynk"
-version = "0.0.0.2"
+version = "0.0.0.3"
 
 repositories {
   jcenter()
@@ -32,13 +32,16 @@ repositories {
 }
 
 dependencies {
-  compile(kotlin("stdlib-jdk8"))
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.23.2")
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.23.2")
-  implementation("info.jdavid.asynk:sql:0.0.0.2")
+  implementation(kotlin("stdlib-jdk8"))
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.23.3")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.23.3")
+  implementation("info.jdavid.asynk:sql:0.0.0.3")
   implementation("org.slf4j:slf4j-api:1.7.25")
-  testImplementation("junit:junit:4.12")
+  testImplementation("org.junit.jupiter:junit-jupiter-api:5.2.0")
+  testImplementation("org.junit.jupiter:junit-jupiter-params:5.2.0")
+  testRuntime("org.junit.jupiter:junit-jupiter-engine:5.2.0")
   testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.6")
+  testImplementation("org.apache.httpcomponents:httpclient:4.5.5")
   testRuntime("org.slf4j:slf4j-jdk14:1.7.25")
 }
 
@@ -59,6 +62,13 @@ val javadocJar by tasks.creating(Jar::class) {
 tasks.withType(KotlinJvmCompile::class.java).all {
   kotlinOptions {
     jvmTarget = "1.8"
+  }
+}
+
+tasks.withType<Test> {
+  useJUnitPlatform()
+  testLogging {
+    events("passed", "skipped", "failed")
   }
 }
 
