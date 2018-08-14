@@ -150,32 +150,32 @@ object Docker {
     }
   }
 
-//  fun createWorldDatabase(databaseVersion: DatabaseVersion) {
-//    HttpClients.createMinimal().let {
-//      val id = it.execute(HttpPost(
-//        "${dockerApiUrl}/containers/async_${databaseVersion.name.toLowerCase()}/exec"
-//      ).apply {
-//        val body = mapOf(
-//          "Cmd" to listOf(
-//            "mysql -uroot -proot < ${File(dataPath(), "world.sql").path}"
-//          )
-//        )
-//        entity = ByteArrayEntity(ObjectMapper().writeValueAsBytes(body), ContentType.APPLICATION_JSON)
-//      }).use {
-//        ObjectMapper().readTree(it.entity.content.readAllBytes()).findValue("Id").asText()
-//      }
-//      it.execute(HttpPost(
-//        "${dockerApiUrl}/exec/${id}/start"
-//      )).use {
-//        println(String(it.entity.content.readAllBytes()))
-//      }
-//      it.execute(HttpGet(
-//        "${dockerApiUrl}/exec/${id}/json"
-//      )).use {
-//        println(String(it.entity.content.readAllBytes()))
-//      }
-//    }
-//  }
+  fun createWorldDatabase(databaseVersion: DatabaseVersion) {
+    HttpClients.createMinimal().let {
+      val id = it.execute(HttpPost(
+        "${dockerApiUrl}/containers/async_${databaseVersion.name.toLowerCase()}/exec"
+      ).apply {
+        val body = mapOf(
+          "Cmd" to listOf(
+            "mysql -uroot -proot < ${File(dataPath(), "world.sql").path}"
+          )
+        )
+        entity = ByteArrayEntity(ObjectMapper().writeValueAsBytes(body), ContentType.APPLICATION_JSON)
+      }).use {
+        ObjectMapper().readTree(it.entity.content.readAllBytes()).findValue("Id").asText()
+      }
+      it.execute(HttpPost(
+        "${dockerApiUrl}/exec/${id}/start"
+      )).use {
+        println(String(it.entity.content.readAllBytes()))
+      }
+      it.execute(HttpGet(
+        "${dockerApiUrl}/exec/${id}/json"
+      )).use {
+        println(String(it.entity.content.readAllBytes()))
+      }
+    }
+  }
 
   @JvmStatic
   fun main(args: Array<String>) {
@@ -183,10 +183,10 @@ object Docker {
     DatabaseVersion.MYSQL_57.let { version ->
       startContainer(version)
       try {
-        //createWorldDatabase(version)
+        createWorldDatabase(version)
       }
       finally {
-        //stopContainer(version)
+        stopContainer(version)
       }
     }
   }
