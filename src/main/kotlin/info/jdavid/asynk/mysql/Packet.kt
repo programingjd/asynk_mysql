@@ -81,7 +81,6 @@ sealed class Packet {
     override fun writeTo(buffer: ByteBuffer) {
       val start = buffer.position()
       buffer.putInt(0)
-      buffer.put(authResponse.size.toByte())
       buffer.put(authResponse)
       buffer.putInt(start, buffer.position() - start - 4)
       buffer.put(start + 3, sequenceId)

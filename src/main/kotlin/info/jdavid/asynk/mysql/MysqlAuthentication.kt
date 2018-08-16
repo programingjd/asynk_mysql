@@ -52,7 +52,7 @@ object MysqlAuthentication {
           val publicKey = authData.data
           val authResponse2 = sha256Password(credentials.password, handshake.scramble, publicKey)
           connection.send(
-            Packet.HandshakeResponse(authData.sequenceId.inc(), database, credentials.username, authResponse2, handshake)
+            Packet.AuthResponse(authData.sequenceId.inc(), authResponse2)
           )
         }
         val switch = connection.receive(Packet.AuthSwitchRequest::class.java)
