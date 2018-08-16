@@ -25,14 +25,14 @@ object Docker {
   private val dockerApiUrl = "http://localhost:2375"
 
   enum class DatabaseVersion(val label: String, val port: Int) {
-    MYSQL_55("mysql/mysql-server:5.5", 8155),
-    MYSQL_56("mysql/mysql-server:5.6", 8156),
-    MYSQL_57("mysql/mysql-server:5.7", 8157),
-//    MYSQL_80("mysql/mysql-server:8.0", 8180),
-    MARIADB_55("library/mariadb:5.5", 8255),
-    MARIADB_100("library/mariadb:10.0", 8210),
-    MARIADB_101("library/mariadb:10.1", 8211),
-    MARIADB_102("library/mariadb:10.2", 8212),
+//    MYSQL_55("mysql/mysql-server:5.5", 8155),
+//    MYSQL_56("mysql/mysql-server:5.6", 8156),
+//    MYSQL_57("mysql/mysql-server:5.7", 8157),
+    MYSQL_80("mysql/mysql-server:8.0", 8158)//,
+//    MARIADB_55("library/mariadb:5.5", 8255),
+//    MARIADB_100("library/mariadb:10.0", 8210),
+//    MARIADB_101("library/mariadb:10.1", 8211),
+//    MARIADB_102("library/mariadb:10.2", 8212),
 //    MARIADB_103("library/mariadb:10.3", 8213),
   }
 
@@ -180,7 +180,7 @@ object Docker {
   @JvmStatic
   fun main(args: Array<String>) {
     check()
-    DatabaseVersion.MYSQL_57.let { version ->
+    DatabaseVersion.MYSQL_80.let { version ->
       startContainer(version)
       try {
         createWorldDatabase(version)

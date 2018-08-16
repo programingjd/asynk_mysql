@@ -51,7 +51,8 @@ sealed class Packet {
     }
   }
 
-  class HandshakeResponse(private val database: String,
+  class HandshakeResponse(private val sequenceId: Byte,
+                          private val database: String,
                           private val username: String, private val authResponse: ByteArray,
                           private val handshake: Handshake): FromClient, Packet() {
     override fun toString() = "HandshakeResponse()"
@@ -71,7 +72,30 @@ sealed class Packet {
       buffer.put(handshake.auth?.toByteArray())
       buffer.put(0.toByte())
       buffer.putInt(start, buffer.position() - start - 4)
-      buffer.put(start + 3, 1.toByte())
+      buffer.put(start + 3, sequenceId)
+    }
+  }
+
+  class AuthResponse(private val sequenceId: Byte, private val authResponse: ByteArray): FromClient, Packet() {
+    override fun toString() = "AuthResponse()"
+    override fun writeTo(buffer: ByteBuffer) {
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put(authResponse.size.toByte())
+      buffer.put(authResponse)
+      buffer.putInt(start, buffer.position() - start - 4)
+      buffer.put(start + 3, sequenceId)
+    }
+  }
+
+  class PublicKeyRetrieval(private val sequenceId: Byte, private val cached: Boolean): FromClient, Packet() {
+    override fun toString() = "PublicKeyRetrieval(${cached})"
+    override fun writeTo(buffer: ByteBuffer) {
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put(if (cached) 0x02.toByte() else 0x01.toByte())
+      buffer.putInt(start, buffer.position() - start - 4)
+      buffer.put(start + 3, sequenceId)
     }
   }
 
@@ -170,6 +194,18 @@ sealed class Packet {
     override fun toString() = "GenericOK(){\n${info}\n}"
   }
 
+  class AuthReadResult(internal val sequenceId: Byte, internal val complete: Boolean): FromServer, Packet() {
+    override fun toString(): String {
+      return "AuthReadResult(${complete})"
+    }
+  }
+
+  class AuthMoreData(internal val sequenceId: Byte, internal val data: String): FromServer, Packet() {
+    override fun toString(): String {
+      return "AuthMoreData(${data})"
+    }
+  }
+
   class AuthSwitchRequest(internal val sequenceId: Byte,
                           internal val scramble: ByteArray,
                           internal val auth: String?): FromServer, Packet() {
@@ -260,6 +296,27 @@ sealed class Packet {
         throw Exception("Error code: ${errorCode}, SQLState: ${sqlState}\n${message}")
       }
       return when (expected) {
+        AuthReadResult::class.java -> {
+          assert(first == 0x01.toByte())
+          val result = buffer.get()
+          assert(start + length == buffer.position())
+          when (result) {
+            0x03.toByte() -> {
+              assert(sequenceId == 2.toByte())
+              AuthReadResult(sequenceId, true)
+            }
+            0x04.toByte() -> {
+              AuthReadResult(sequenceId,false)
+            }
+            else -> throw Exception("Unexpected fast auth response.")
+          } as T
+        }
+        AuthMoreData::class.java -> {
+          assert(first == 0x01.toByte())
+          val data = BinaryFormat.getNullTerminatedString(buffer, start + length)
+          assert(start + length == buffer.position())
+          return AuthMoreData(sequenceId, data) as T
+        }
         AuthSwitchRequest::class.java -> {
           assert(first == 0x00.toByte() || first == 0xfe.toByte())
           if (first == 0x00.toByte()) {
