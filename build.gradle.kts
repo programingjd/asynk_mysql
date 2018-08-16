@@ -42,7 +42,7 @@ dependencies {
   testRuntime("org.junit.jupiter:junit-jupiter-engine:5.2.0")
   testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.6")
   testImplementation("org.apache.httpcomponents:httpclient:4.5.5")
-  testImplementation("mysql:mysql-connector-java:8.0.12")
+//  testImplementation("mysql:mysql-connector-java:8.0.12")
   testRuntime("org.slf4j:slf4j-jdk14:1.7.25")
 }
 

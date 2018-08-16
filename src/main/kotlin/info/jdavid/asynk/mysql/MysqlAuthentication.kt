@@ -35,10 +35,24 @@ object MysqlAuthentication {
           throw Exception("Server requests unsupported authentication method: ${handshake.auth}")
         }
       }
-//      "sha256_password" -> {
-//        if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
-//        TODO()
-//      }
+      "sha256_password" -> {
+        if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
+        connection.send(
+          Packet.HandshakeResponse(
+            0x01.toByte(), database, credentials.username, byteArrayOf(0x01.toByte()), handshake
+          )
+        )
+        val authData = connection.receive(Packet.AuthMoreData::class.java)
+        val publicKey = authData.data
+        val authResponse = sha256Password(credentials.password, handshake.scramble, publicKey)
+        connection.send(
+          Packet.AuthResponse(authData.sequenceId.inc(), authResponse)
+        )
+        val switch = connection.receive(Packet.AuthSwitchRequest::class.java)
+        if (switch.auth != null) {
+          throw Exception("Server requests unsupported authentication method: ${handshake.auth}")
+        }
+      }
       "caching_sha2_password" -> {
         if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
         val authResponse = cachingSha2Password(credentials.password, handshake.scramble)
