@@ -7,7 +7,7 @@ class Debug {
   companion object {
     @JvmStatic
     fun main(args: Array<String>) {
-      Docker.DatabaseVersion.MYSQL_80.let { version ->
+      Docker.DatabaseVersion.values().last().let { version ->
         Docker.startContainer(version)
         try {
           val conn =
