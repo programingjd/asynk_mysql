@@ -25,16 +25,16 @@ object Docker {
   private val dockerApiUrl = "http://localhost:2375"
 
   enum class DatabaseVersion(val label: String, val port: Int, val sha256password: Boolean = false) {
-//    MYSQL_55("mysql/mysql-server:5.5", 8155),
-//    MYSQL_56("mysql/mysql-server:5.6", 8156),
-//    MYSQL_57("mysql/mysql-server:5.7", 8157),
-    MYSQL_57_SHA256("mysql/mysql-server:5.7", 8157, true)
-//    MYSQL_80("mysql/mysql-server:8.0", 8158)//,
-//    MARIADB_55("library/mariadb:5.5", 8255),
-//    MARIADB_100("library/mariadb:10.0", 8210),
-//    MARIADB_101("library/mariadb:10.1", 8211),
-//    MARIADB_102("library/mariadb:10.2", 8212),
-//    MARIADB_103("library/mariadb:10.3", 8213),
+    MYSQL_55("mysql/mysql-server:5.5", 8155),
+    MYSQL_56("mysql/mysql-server:5.6", 8156),
+    MYSQL_57("mysql/mysql-server:5.7", 8157),
+    MYSQL_57_SHA256("mysql/mysql-server:5.7", 8157, true),
+    MYSQL_80("library/mysql:8.0", 8158),
+    MARIADB_55("library/mariadb:5.5", 8255),
+    MARIADB_100("library/mariadb:10.0", 8210),
+    MARIADB_101("library/mariadb:10.1", 8211),
+    MARIADB_102("library/mariadb:10.2", 8212)
+//    MARIADB_103("library/mariadb:10.3", 8213)
   }
 
   fun check() {
@@ -87,7 +87,24 @@ object Docker {
           "ExposedPorts" to mapOf("3306/tcp" to emptyMap<String, Any>())
         )
         if (databaseVersion.sha256password) {
-          body.put("Cmd", listOf("mysqld", "--default-authentication-plugin=sha256_password"))
+          body.put(
+            "Cmd",
+            listOf("mysqld", "--default-authentication-plugin=sha256_password")
+          )
+        }
+        if (databaseVersion.label.startsWith("library")) {
+          body.put(
+            "Healthcheck",
+            mapOf(
+              "Test" to listOf(
+                "CMD-SHELL", "mysql --user=root --password=root --execute \"SHOW DATABASES;\""
+              ),
+              "Interval" to 10000000000,
+              "Timeout" to 5000000000,
+              "Retries" to 5,
+              "StartPeriod" to 0
+            )
+          )
         }
         entity = ByteArrayEntity(ObjectMapper().writeValueAsBytes(body), ContentType.APPLICATION_JSON)
       }).use {
