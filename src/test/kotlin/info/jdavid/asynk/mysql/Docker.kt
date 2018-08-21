@@ -29,7 +29,7 @@ object Docker {
     MYSQL_56("mysql/mysql-server:5.6", 8156),
     MYSQL_57("mysql/mysql-server:5.7", 8157),
     MYSQL_57_SHA256("mysql/mysql-server:5.7", 8157, true),
-    MYSQL_80("library/mysql:8.0", 8158),
+    MYSQL_80("mysql/mysql-server:8.0", 8158),
     MARIADB_55("library/mariadb:5.5", 8255),
     MARIADB_100("library/mariadb:10.0", 8210),
     MARIADB_101("library/mariadb:10.1", 8211),
@@ -204,7 +204,7 @@ object Docker {
     DatabaseVersion.values().last().let { version ->
       startContainer(version)
       try {
-        createWorldDatabase(version)
+        //createWorldDatabase(version)
       }
       finally {
         stopContainer(version)
