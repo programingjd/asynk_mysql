@@ -179,13 +179,13 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
      * Connects to a Mysql or MariaDB database using the supplied credentials.
      * @param database the database name.
      * @param credentials the credentials to use for the connection (defaults to root unsecured credentials).
-     * @param address the server address and port (localhost:5432 by default).
+     * @param address the server address and port (localhost:3306 by default).
      * @param bufferSize the buffer size (4MB by default).
      */
     suspend fun to(
       database: String,
       credentials: MysqlAuthentication.Credentials = MysqlAuthentication.Credentials.UnsecuredCredentials(),
-      address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 5432),
+      address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 3306),
       bufferSize: Int = 4194304 // needs to hold any RowData message
     ): MysqlConnection {
       if (bufferSize < 1024) throw IllegalArgumentException(
