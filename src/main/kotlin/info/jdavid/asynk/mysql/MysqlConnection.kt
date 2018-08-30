@@ -21,6 +21,9 @@ import kotlin.coroutines.experimental.coroutineContext
 typealias PreparedStatement= Connection.PreparedStatement<MysqlConnection>
 
 
+/**
+ * Mysql/MariaDB database connection.
+ */
 class MysqlConnection internal constructor(private val channel: AsynchronousSocketChannel,
                                            private val buffer: ByteBuffer): Connection<MysqlConnection> {
 
@@ -172,6 +175,13 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
   }
 
   companion object {
+    /**
+     * Connects to a Mysql or MariaDB database using the supplied credentials.
+     * @param database the database name.
+     * @param credentials the credentials to use for the connection (defaults to root unsecured credentials).
+     * @param address the server address and port (localhost:5432 by default).
+     * @param bufferSize the buffer size (4MB by default).
+     */
     suspend fun to(
       database: String,
       credentials: MysqlAuthentication.Credentials = MysqlAuthentication.Credentials.UnsecuredCredentials(),

@@ -128,9 +128,22 @@ object MysqlAuthentication {
 
   class Exception(message: String): RuntimeException(message)
 
+  /**
+   * Implementations of the different credentials available for Mysql and MariaDB.
+   */
   sealed class Credentials(internal val username: String): MysqlCredentials {
 
+    /**
+     * Username only (no password) unsecured credentials.
+     * @param username the database username (root by default).
+     */
     class UnsecuredCredentials(username: String = "root"): Credentials(username)
+
+    /**
+     * Username/password credentials.
+     * @param username the database username (root by default).
+     * @param password the user password (blank by default).
+     */
     class PasswordCredentials(username: String = "root",
                               internal val password: String = ""): Credentials(username)
 

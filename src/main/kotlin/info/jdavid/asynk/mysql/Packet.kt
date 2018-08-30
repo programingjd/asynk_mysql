@@ -3,7 +3,7 @@ package info.jdavid.asynk.mysql
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-sealed class Packet {
+internal sealed class Packet {
 
   internal interface FromServer
   internal interface FromClient {
