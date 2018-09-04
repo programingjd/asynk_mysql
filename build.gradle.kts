@@ -128,7 +128,7 @@ bintray {
     githubRepo = "programingjd/asynk_mysql"
     githubReleaseNotesFile = "README.md"
     setLicenses("Apache-2.0")
-    setLabels("asynk", "mysql", "mariadb", "sql", "java", "kotlin", "async", "coroutines")
+    setLabels("asynk", "mysql", "mariadb", "sql", "java", "kotlin", "async", "coroutines", "suspend")
     publicDownloadNumbers = true
     version(delegateClosureOf<BintrayExtension.VersionConfig> {
       name = "${project.version}"
