@@ -15,7 +15,7 @@ Include [those settings](https://bintray.com/repo/downloadMavenRepoSettingsFile/
  to be able to resolve jcenter artifacts.
 ```
 <dependency>
-  <groupId>info.jdavid.asynk.mysql</groupId>
+  <groupId>info.jdavid.asynk</groupId>
   <artifactId>mysql</artifactId>
   <version>0.0.0.8</version>
 </dependency>
