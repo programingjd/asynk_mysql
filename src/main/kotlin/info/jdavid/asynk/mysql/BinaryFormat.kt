@@ -139,7 +139,7 @@ internal object BinaryFormat {
         buffer.put(date.dayOfMonth.toByte())
       }
       Types.VARCHAR, Types.VARSTRING, Types.STRING -> {
-        val bytes = when(value) {
+        val bytes = if (value is ByteArray) value else when(value) {
           is CharSequence -> value.toString()
           is Boolean -> if (value) "1" else "0"
           is Number -> value.toString()
