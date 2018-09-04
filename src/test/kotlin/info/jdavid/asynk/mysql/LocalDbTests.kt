@@ -445,6 +445,41 @@ class LocalDbTests {
 
   @ParameterizedTest(name = "{index} => {0}")
   @EnumSource(value = Docker.DatabaseVersion::class)
+  fun testBlob(databaseVersion: Docker.DatabaseVersion) {
+    runBlocking {
+      val bytes = byteArrayOf(0x02.toByte(), 0x00.toByte(), 0xfa.toByte(), 0x8e.toByte())
+      val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
+      credentials.connectTo(databaseName, address).use {
+        assertEquals(0, it.affectedRows(
+          """
+            CREATE TEMPORARY TABLE test (
+              id             serial    PRIMARY KEY,
+              data           BLOB
+            )
+          """.trimIndent()
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (data) VALUES (?)
+          """.trimIndent(),
+          listOf(bytes)
+        ))
+        it.rows(
+          """
+            SELECT * FROM test
+          """.trimIndent()
+        ).toList().apply {
+          assertEquals(1, size)
+          assertTrue(get(0)["data"] is ByteArray)
+          val data = get(0)["data"] as ByteArray
+          assertArrayEquals(bytes, data)
+        }
+      }
+    }
+  }
+
+  @ParameterizedTest(name = "{index} => {0}")
+  @EnumSource(value = Docker.DatabaseVersion::class)
   fun testTransactions(databaseVersion: Docker.DatabaseVersion) {
     runBlocking {
       val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
