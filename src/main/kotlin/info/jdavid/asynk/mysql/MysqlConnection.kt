@@ -129,7 +129,9 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       assert(buffer.limit() == buffer.position())
     }
     packet.writeTo(buffer.clear() as ByteBuffer)
-    channel.aWrite(buffer.flip() as ByteBuffer, 5000L, TimeUnit.MILLISECONDS)
+    (buffer.flip() as ByteBuffer).apply {
+      while (remaining() > 0) channel.aWrite(this, 5000L, TimeUnit.MILLISECONDS)
+    }
     buffer.clear().flip()
   }
 
