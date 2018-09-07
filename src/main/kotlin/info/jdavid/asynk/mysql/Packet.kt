@@ -221,7 +221,7 @@ internal sealed class Packet {
   }
 
   class ColumnDefinition(internal val name: String, internal val table: String,
-                         internal val type: Byte, internal val length: Int,
+                         internal val type: Byte, internal val length: Long,
                          internal val unsigned: Boolean,
                          internal val binary: Boolean): FromServer, Packet() {
     override fun toString() = "ColumnDefinition(${table}.${name})"
@@ -379,7 +379,7 @@ internal sealed class Packet {
           /*val nameOrg =*/ BinaryFormat.getLengthEncodedString(buffer)
           /*val n =*/ BinaryFormat.getLengthEncodedInteger(buffer)
           /*val collation =*/ buffer.getShort()
-          val columnLength = buffer.getInt()
+          val columnLength = buffer.getInt().toLong() and 0xffffffff
           val columnType = buffer.get()
           val flags = Bitmap(16).set(buffer)
           val binary = flags.get(7)

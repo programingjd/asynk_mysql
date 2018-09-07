@@ -484,11 +484,11 @@ class LocalDbTests {
   fun testSizes(databaseVersion: Docker.DatabaseVersion) {
     runBlocking {
       val sizes = listOf(
-//        ByteArray(50) { it.toByte() },
-//        ByteArray(300) { it.toByte() },
-//        ByteArray(15000) { it.toByte() },
-//        ByteArray(45000) { it.toByte() },
-        ByteArray(100000) { it.toByte() }
+        ByteArray(50) { it.toByte() },
+        ByteArray(300) { it.toByte() },
+        ByteArray(15000) { it.toByte() },
+        ByteArray(45000) { it.toByte() }//,
+//        ByteArray(100000) { it.toByte() }
       )
       val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
       credentials.connectTo(databaseName, address, 16000000).use {
@@ -496,7 +496,7 @@ class LocalDbTests {
           """
             CREATE TEMPORARY TABLE test (
               id             serial    PRIMARY KEY,
-              data           BLOB
+              data           LONGBLOB
             )
           """.trimIndent()
         ))

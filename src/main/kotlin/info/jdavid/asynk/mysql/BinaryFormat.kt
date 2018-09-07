@@ -15,10 +15,10 @@ import java.util.Date
 
 internal object BinaryFormat {
 
-  fun write(value: Any, type: Byte, length: Int, unsigned: Boolean, buffer: ByteBuffer) {
+  fun write(value: Any, type: Byte, length: Long, unsigned: Boolean, buffer: ByteBuffer) {
     when (type) {
       Types.BIT -> {
-        if (length == 1) {
+        if (length == 1L) {
           buffer.put(0x01.toByte())
           buffer.put(when(value) {
             is Boolean -> if (value == false) 0x00.toByte() else 0x01.toByte()
@@ -28,7 +28,7 @@ internal object BinaryFormat {
               else -> throw IllegalArgumentException()
             }
             is Number -> value.toByte()
-            is ByteArray -> if (length != 1) throw IllegalArgumentException() else value[0]
+            is ByteArray -> if (length != 1L) throw IllegalArgumentException() else value[0]
             is BitSet -> if (value.size() > 1) throw IllegalArgumentException() else {
               if (!value.get(0)) 0x00.toByte() else 0x01.toByte()
             }
@@ -39,7 +39,7 @@ internal object BinaryFormat {
           })
         }
         else {
-          val n: Int = length + 7 / 8
+          val n: Int = length.toInt() + 7 / 8
           buffer.put(n.toByte())
           buffer.put(when(value) {
             is BitSet -> {
@@ -164,15 +164,15 @@ internal object BinaryFormat {
   }
 
   @Suppress("UsePropertyAccessSyntax")
-  fun read(type: Byte, length: Int, unsigned: Boolean, binary: Boolean, buffer: ByteBuffer): Any? {
+  fun read(type: Byte, length: Long, unsigned: Boolean, binary: Boolean, buffer: ByteBuffer): Any? {
     return when (type) {
       Types.BIT -> {
         val n = buffer.get().toInt()
-        if (length == 1 && n == 1) buffer.get() != 0.toByte() else Bitmap(length).set(buffer, n).bytes
+        if (length == 1L && n == 1) buffer.get() != 0.toByte() else Bitmap(length.toInt()).set(buffer,n).bytes
       }
       Types.BYTE -> when {
         unsigned -> (buffer.get().toInt() and 0xff).toShort()
-        length == 1 -> buffer.get() != 0.toByte()
+        length == 1L -> buffer.get() != 0.toByte()
         else -> buffer.get()
       }
       Types.SHORT -> if (unsigned) buffer.getShort().toInt() and 0xffff else buffer.getShort()
