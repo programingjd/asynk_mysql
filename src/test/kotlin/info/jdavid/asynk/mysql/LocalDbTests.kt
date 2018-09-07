@@ -5,6 +5,7 @@ import kotlinx.coroutines.experimental.runBlocking
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import java.math.BigInteger
@@ -473,6 +474,51 @@ class LocalDbTests {
           assertTrue(get(0)["data"] is ByteArray)
           val data = get(0)["data"] as ByteArray
           assertArrayEquals(bytes, data)
+        }
+      }
+    }
+  }
+
+  @ParameterizedTest(name = "{index} => {0}")
+  @EnumSource(value = Docker.DatabaseVersion::class)
+  fun testSizes(databaseVersion: Docker.DatabaseVersion) {
+    runBlocking {
+      val sizes = listOf(
+//        ByteArray(50) { it.toByte() },
+//        ByteArray(300) { it.toByte() },
+//        ByteArray(15000) { it.toByte() },
+//        ByteArray(45000) { it.toByte() },
+        ByteArray(100000) { it.toByte() }
+      )
+      val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
+      credentials.connectTo(databaseName, address, 16000000).use {
+        assertEquals(0, it.affectedRows(
+          """
+            CREATE TEMPORARY TABLE test (
+              id             serial    PRIMARY KEY,
+              data           BLOB
+            )
+          """.trimIndent()
+        ))
+        sizes.forEach {bytes ->
+          assertEquals(1, it.affectedRows(
+            """
+            INSERT INTO test (data) VALUES (?)
+          """.trimIndent(),
+            listOf(bytes)
+          ))
+        }
+        it.rows(
+          """
+            SELECT * FROM test
+          """.trimIndent()
+        ).toList().apply {
+          assertEquals(sizes.size, size)
+          sizes.forEachIndexed { index, bytes ->
+            val data = get(index)["data"]
+            assertTrue(data is ByteArray)
+            assertArrayEquals(bytes, data as ByteArray)
+          }
         }
       }
     }

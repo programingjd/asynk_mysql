@@ -124,8 +124,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
 
   internal suspend fun send(packet: Packet.FromClient) {
     if (buffer.limit() != buffer.position()) {
-      val eof = receive(Packet.EOF::class.java)
-      println(eof)
+      /*val eof =*/ receive(Packet.EOF::class.java)
       assert(buffer.limit() == buffer.position())
     }
     packet.writeTo(buffer.clear() as ByteBuffer)
@@ -142,13 +141,17 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
         if (packet != null) return packet
       }
     }
-    buffer.compact()
-    val left = buffer.capacity() - buffer.position()
-    val n = channel.aRead(buffer, 5000L, TimeUnit.MILLISECONDS)
-    if (n == left) throw RuntimeException("Connection buffer too small.")
-    buffer.flip()
     try {
-      return Packet.fromBytes(buffer, type) ?: throw RuntimeException("Connection buffer too small.")
+      while (true) {
+        buffer.compact()
+        val left = buffer.capacity() - buffer.position()
+        val n = channel.aRead(buffer, 5000L, TimeUnit.MILLISECONDS)
+        if (n == left) throw RuntimeException("Connection buffer too small.")
+        buffer.flip()
+        val packet = Packet.fromBytes(buffer, type)
+        if (packet != null) return packet
+        if (buffer.position() == buffer.capacity()) throw RuntimeException("Connection buffer too small.")
+      }
     }
     catch (e: Packet.Exception) {
       if (e.message != null) err(e.message)

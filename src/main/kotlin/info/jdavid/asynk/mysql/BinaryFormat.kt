@@ -245,6 +245,12 @@ internal object BinaryFormat {
     return one + two * 256 + three * 256 * 256
   }
 
+  fun twoByteInteger(buffer: ByteBuffer): Int {
+    val one = buffer.get().toInt() and 0xff
+    val two = buffer.get().toInt() and 0xff
+    return one + two * 256
+  }
+
   fun getLengthEncodedInteger(buffer: ByteBuffer): Long {
     val first = buffer.get().toInt() and 0xff
     @Suppress("UsePropertyAccessSyntax")
@@ -252,7 +258,7 @@ internal object BinaryFormat {
       0xff -> throw RuntimeException()
       0xfe -> buffer.getLong()
       0xfd -> threeByteInteger(buffer).toLong()
-      0xfc -> buffer.getInt().toLong()
+      0xfc -> twoByteInteger(buffer).toLong()
       else -> first.toLong()
     }
   }
@@ -262,9 +268,16 @@ internal object BinaryFormat {
       value < 251 -> buffer.put(value.toByte())
       value < 65536 -> {
         buffer.put(0xfc.toByte())
-        buffer.putShort(value.toShort())
+        buffer.putShort((value and 0xffff).toShort())
       }
-      else -> TODO()
+      value < 16777216 -> {
+        buffer.putInt(value)
+        buffer.put(buffer.position() - 4, 0xfd.toByte())
+      }
+      else -> {
+        buffer.put(0xfe.toByte())
+        buffer.putLong(value.toLong())
+      }
     }
   }
 
