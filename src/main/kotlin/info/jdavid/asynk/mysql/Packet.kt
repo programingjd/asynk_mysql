@@ -248,14 +248,53 @@ internal sealed class Packet {
       val map = LinkedHashMap<String,Any?>(n)
       for (i in 0 until n) {
         val col = cols[i]
-        if (bitmap.get(i)) {
-          map[col.name] = null
-        }
-        else {
-          map[col.name] = BinaryFormat.read(col.type, col.length, col.unsigned, col.binary, buffer)
-        }
+        map[col.name] =
+          if (bitmap.get(i)) null
+          else BinaryFormat.read(col.type, col.length, col.unsigned, col.binary, buffer)
       }
       return map
+    }
+    internal fun <T> decode(cols: List<ColumnDefinition>, columnNameOrAlias: String): T {
+      val n = cols.size
+      if (n == 0) {
+        @Suppress("UNCHECKED_CAST")
+        return null as T
+      }
+      val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+      val bitmap =  Bitmap(n, 2).set(buffer)
+      var value: Any? = null
+      for (i in 0 until n) {
+        val col = cols[i]
+        val v =
+          if (bitmap.get(i)) null
+          else BinaryFormat.read(col.type, col.length, col.unsigned, col.binary, buffer)
+        if (col.name == columnNameOrAlias) value = v
+      }
+      @Suppress("UNCHECKED_CAST")
+      return value as T
+    }
+    internal fun <K,V> decode(cols: List<ColumnDefinition>,
+                              keyColumnNameOrAlias: String,
+                              valueColumnNameOrAlias: String): Pair<K,V> {
+      val n = cols.size
+      if (n == 0) {
+        @Suppress("UNCHECKED_CAST")
+        return null as K to null as V
+      }
+      val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+      val bitmap =  Bitmap(n, 2).set(buffer)
+      var key: Any? = null
+      var value: Any? = null
+      for (i in 0 until n) {
+        val col = cols[i]
+        val v =
+          if (bitmap.get(i)) null
+          else BinaryFormat.read(col.type, col.length, col.unsigned, col.binary, buffer)
+        if (col.name == keyColumnNameOrAlias) key = v
+        if (col.name == valueColumnNameOrAlias) value = v
+      }
+      @Suppress("UNCHECKED_CAST")
+      return key as K to value as V
     }
   }
 

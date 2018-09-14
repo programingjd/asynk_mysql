@@ -5,7 +5,6 @@ import kotlinx.coroutines.experimental.runBlocking
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import java.math.BigInteger
@@ -87,6 +86,29 @@ class LocalDbTests {
           """
             SELECT * FROM test ORDER BY name
           """.trimIndent()
+        ).use { rs ->
+          val iterator = rs.iterator()
+          assertTrue(iterator.hasNext())
+          iterator.next().apply {
+            assertEquals("Name1", this["name"])
+            assertFalse(this["active"] as Boolean)
+          }
+          assertTrue(iterator.hasNext())
+          iterator.next().apply {
+            assertEquals("Name2", this["name"])
+            assertTrue(this["active"] as Boolean)
+          }
+          assertTrue(iterator.hasNext())
+          iterator.next().apply {
+            assertEquals("Name3", this["name"])
+            assertFalse(this["active"] as Boolean)
+          }
+          assertFalse(iterator.hasNext())
+        }
+        it.rows(
+          """
+            SELECT * FROM test ORDER BY name
+          """.trimIndent()
         ).toList().apply {
           assertEquals(3, size)
           assertEquals("Name1", get(0)["name"])
@@ -95,6 +117,69 @@ class LocalDbTests {
           assertTrue(get(1)["active"] as Boolean)
           assertEquals("Name3", get(2)["name"])
           assertFalse(get(2)["active"] as Boolean)
+        }
+        it.values<String>(
+          """
+            SELECT * FROM test ORDER BY name
+          """.trimIndent(),
+          "name"
+        ).toList().apply {
+          assertEquals(3, size)
+          assertEquals("Name1", get(0))
+          assertEquals("Name2", get(1))
+          assertEquals("Name3", get(2))
+        }
+        it.values<Boolean>(
+          """
+            SELECT * FROM test ORDER BY name
+          """.trimIndent(),
+          "active"
+        ).use { rs ->
+          val iterator = rs.iterator()
+          assertTrue(iterator.hasNext())
+          assertFalse(iterator.next())
+          assertTrue(iterator.hasNext())
+          assertTrue(iterator.next())
+          assertTrue(iterator.hasNext())
+          assertFalse(iterator.next())
+          assertFalse(iterator.hasNext())
+        }
+        it.entries<String,Boolean>(
+          """
+            SELECT * FROM test ORDER BY name
+          """.trimIndent(),
+          "name",
+          "active"
+        ).toMap().apply {
+          assertEquals(3, size)
+          assertFalse(this["Name1"] ?: fail<Nothing>())
+          assertTrue(this["Name2"] ?: fail<Nothing>())
+          assertFalse(this["Name3"] ?: fail<Nothing>())
+        }
+        it.entries<String,Boolean>(
+          """
+            SELECT * FROM test ORDER BY name
+          """.trimIndent(),
+          "name",
+          "active"
+        ).use { rs ->
+          val iterator = rs.iterator()
+          assertTrue(iterator.hasNext())
+          iterator.next().apply {
+            assertEquals("Name1", first)
+            assertFalse(second)
+          }
+          assertTrue(iterator.hasNext())
+          iterator.next().apply {
+            assertEquals("Name2", first)
+            assertTrue(second)
+          }
+          assertTrue(iterator.hasNext())
+          iterator.next().apply {
+            assertEquals("Name3", first)
+            assertFalse(second)
+          }
+          assertFalse(iterator.hasNext())
         }
         assertEquals(2, it.affectedRows(
           """
@@ -185,6 +270,10 @@ class LocalDbTests {
           assertFalse(temporary)
           assertEquals(4, rows(listOf(false)).toList().size)
           assertEquals(0, rows(listOf(true)).toList().size)
+          assertEquals(4, values<String>(listOf(false), "name").toList().size)
+          assertEquals(0, values<String>(listOf(true), "name").toList().size)
+          assertEquals(4, entries<String,Boolean>(listOf(false), "name", "active").toMap().size)
+          assertEquals(0, entries<String,Boolean>(listOf(true), "name", "active").toMap().size)
           assertEquals(1, it.affectedRows("DELETE FROM test WHERE name=?", listOf("Name4")))
           assertEquals(3, rows(listOf(false)).toList().size)
           assertEquals(1, it.affectedRows("UPDATE test SET active=TRUE WHERE name=?", listOf("Name1")))
