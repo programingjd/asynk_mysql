@@ -289,23 +289,31 @@ internal object BinaryFormat {
   fun getLengthEncodedString(buffer: ByteBuffer) = String(getLengthEncodedBlob(buffer))
 
   fun getNullTerminatedString(buffer: ByteBuffer): String {
-    val sb = StringBuilder(Math.min(255, buffer.remaining()))
+    val buf = ByteBuffer.allocate(buffer.remaining())
     while (buffer.remaining() > 0) {
       val b = buffer.get()
       if (b == 0.toByte()) break
-      sb.appendCodePoint(b.toInt())
+      buf.put(b)
     }
-    return sb.toString()
+    buf.flip()
+    return String(ByteArray(buf.remaining()).apply {
+      buf.get(this)
+      buf.clear()
+    })
   }
 
   fun getNullTerminatedString(buffer: ByteBuffer, end: Int): String {
-    val sb = StringBuilder(Math.min(255, end - buffer.position()))
+    val buf = ByteBuffer.allocate(end - buffer.position())
     while (buffer.position() < end) {
       val b = buffer.get()
       if (b == 0.toByte()) break
-      sb.appendCodePoint(b.toInt())
+      buf.put(b)
     }
-    return sb.toString()
+    buf.flip()
+    return String(ByteArray(buf.remaining()).apply {
+      buf.get(this)
+      buf.clear()
+    })
   }
 
 }
