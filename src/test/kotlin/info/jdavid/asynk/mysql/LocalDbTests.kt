@@ -1,6 +1,5 @@
 package info.jdavid.asynk.mysql
 
-import info.jdavid.asynk.sql.use
 import kotlinx.coroutines.experimental.runBlocking
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.*
@@ -259,7 +258,7 @@ class LocalDbTests {
           assertEquals(1, affectedRows(listOf("Name2")))
           assertEquals(1, affectedRows(listOf("Name3")))
           assertEquals(1, affectedRows(listOf("Name4")))
-          aClose()
+          close()
           try {
             affectedRows(listOf("Name5"))
             fail("Execution of closed prepared statement should have failed.")
@@ -278,7 +277,7 @@ class LocalDbTests {
           assertEquals(3, rows(listOf(false)).toList().size)
           assertEquals(1, it.affectedRows("UPDATE test SET active=TRUE WHERE name=?", listOf("Name1")))
           assertEquals(2, rows(listOf(false)).toList().size)
-          aClose()
+          close()
           try {
             rows(listOf(false))
             fail("Execution of closed prepared statement should have failed.")

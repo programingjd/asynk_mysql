@@ -1,15 +1,18 @@
 package info.jdavid.asynk.mysql
 
+import info.jdavid.asynk.core.asyncConnect
+import info.jdavid.asynk.core.asyncRead
+import info.jdavid.asynk.core.asyncWrite
+import info.jdavid.asynk.core.internal.use
 import info.jdavid.asynk.sql.Connection
+import kotlinx.coroutines.experimental.CancellationException
+import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.channels.Channel
 import kotlinx.coroutines.experimental.channels.toCollection
 import kotlinx.coroutines.experimental.channels.toList
 import kotlinx.coroutines.experimental.channels.toMap
-import kotlinx.coroutines.experimental.currentScope
 import kotlinx.coroutines.experimental.launch
-import kotlinx.coroutines.experimental.nio.aConnect
-import kotlinx.coroutines.experimental.nio.aRead
-import kotlinx.coroutines.experimental.nio.aWrite
+import kotlinx.coroutines.experimental.withTimeout
 import org.slf4j.LoggerFactory
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -17,7 +20,7 @@ import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.AsynchronousSocketChannel
-import java.util.concurrent.TimeUnit
+import kotlin.coroutines.experimental.coroutineContext
 
 typealias PreparedStatement= Connection.PreparedStatement<MysqlConnection>
 
@@ -28,7 +31,11 @@ typealias PreparedStatement= Connection.PreparedStatement<MysqlConnection>
 class MysqlConnection internal constructor(private val channel: AsynchronousSocketChannel,
                                            private val buffer: ByteBuffer): Connection<MysqlConnection> {
 
-  override suspend fun aClose() {
+  suspend inline fun <R> use(block: (MysqlConnection) -> R): R {
+    return info.jdavid.asynk.core.internal.use(this) { block(this) }
+  }
+
+  override suspend fun close() {
     try {
       send(Packet.Quit())
     }
@@ -121,20 +128,20 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       cols.add(receive(Packet.ColumnDefinition::class.java))
     }
     receive(Packet.EOF::class.java)
-    val channel = Channel<T>()
-    currentScope {
-      launch {
-        while (true) {
-          val row = receive(Packet.Row::class.java)
-          if (row.bytes == null) break
-          channel.send(row.decode(cols, columnNameOrAlias))
-        }
-        if (preparedStatement.temporary) {
-          send(Packet.StatementReset(preparedStatement.id))
-          /*val ok =*/ receive(Packet.OK::class.java)
-        }
-        channel.close()
+    val channel = Channel<T>(128)
+    CoroutineScope(coroutineContext).launch {
+      var open = true
+      while (true) {
+        val row = receive(Packet.Row::class.java)
+        if (row.bytes == null) break
+        if (open) try { channel.send(row.decode(cols, columnNameOrAlias)) }
+        catch (ignore: CancellationException) { open = false }
       }
+      if (preparedStatement.temporary) {
+        send(Packet.StatementReset(preparedStatement.id))
+        /*val ok =*/ receive(Packet.OK::class.java)
+      }
+      channel.close()
     }
     return MysqlResultSet(channel)
   }
@@ -152,20 +159,20 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       cols.add(receive(Packet.ColumnDefinition::class.java))
     }
     receive(Packet.EOF::class.java)
-    val channel = Channel<Pair<K,V>>()
-    currentScope {
-      launch {
-        while (true) {
-          val row = receive(Packet.Row::class.java)
-          if (row.bytes == null) break
-          channel.send(row.decode(cols, keyColumnNameOrAlias, valueColumnNameOrAlias))
-        }
-        if (preparedStatement.temporary) {
-          send(Packet.StatementReset(preparedStatement.id))
-          /*val ok =*/ receive(Packet.OK::class.java)
-        }
-        channel.close()
+    val channel = Channel<Pair<K,V>>(128)
+    CoroutineScope(coroutineContext).launch {
+      var open = true
+      while (true) {
+        val row = receive(Packet.Row::class.java)
+        if (row.bytes == null) break
+        if (open) try { channel.send(row.decode(cols, keyColumnNameOrAlias, valueColumnNameOrAlias)) }
+        catch (ignore: CancellationException) { open = false }
       }
+      if (preparedStatement.temporary) {
+        send(Packet.StatementReset(preparedStatement.id))
+        /*val ok =*/ receive(Packet.OK::class.java)
+      }
+      channel.close()
     }
     return MysqlResultMap(channel)
   }
@@ -181,20 +188,20 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       cols.add(receive(Packet.ColumnDefinition::class.java))
     }
     receive(Packet.EOF::class.java)
-    val channel = Channel<Map<String, Any?>>()
-    currentScope {
-      launch {
-        while (true) {
-          val row = receive(Packet.Row::class.java)
-          if (row.bytes == null) break
-          channel.send(row.decode(cols))
-        }
-        if (preparedStatement.temporary) {
-          send(Packet.StatementReset(preparedStatement.id))
-          /*val ok =*/ receive(Packet.OK::class.java)
-        }
-        channel.close()
+    val channel = Channel<Map<String, Any?>>(128)
+    CoroutineScope(coroutineContext).launch {
+      var open = true
+      while (true) {
+        val row = receive(Packet.Row::class.java)
+        if (row.bytes == null) break
+        if (open) try { channel.send(row.decode(cols)) }
+        catch (ignored: CancellationException) { open = false }
       }
+      if (preparedStatement.temporary) {
+        send(Packet.StatementReset(preparedStatement.id))
+        /*val ok =*/ receive(Packet.OK::class.java)
+      }
+      channel.close()
     }
     return MysqlResultSet(channel)
   }
@@ -221,8 +228,12 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       assert(buffer.limit() == buffer.position())
     }
     packet.writeTo(buffer.clear() as ByteBuffer)
-    (buffer.flip() as ByteBuffer).apply {
-      while (remaining() > 0) channel.aWrite(this, 5000L, TimeUnit.MILLISECONDS)
+    (buffer.flip() as ByteBuffer).also {
+      while (it.remaining() > 0) {
+        withTimeout(5000L) {
+          channel.asyncWrite(it)
+        }
+      }
     }
     buffer.clear().flip()
   }
@@ -238,7 +249,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       while (true) {
         buffer.compact()
         val left = buffer.capacity() - buffer.position()
-        val n = channel.aRead(buffer, 5000L, TimeUnit.MILLISECONDS)
+        val n = withTimeout(5000L) { channel.asyncRead(buffer) }.toInt()
         if (n == left) throw RuntimeException("Connection buffer too small.")
         buffer.flip()
         val packet = Packet.fromBytes(buffer, type)
@@ -256,6 +267,11 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
                                      internal val id: Int,
                                      internal val types: List<Packet.ColumnDefinition>,
                                      internal val temporary: Boolean): PreparedStatement {
+
+    suspend inline fun <R> use(block: (MysqlPreparedStatement) -> R): R {
+      return info.jdavid.asynk.core.internal.use(this) { block(this) }
+    }
+
     override suspend fun rows() = this@MysqlConnection.rows(this)
     override suspend fun rows(params: Iterable<Any?>) = this@MysqlConnection.rows(this, params)
     override suspend fun <T> values(columnNameOrAlias: String): MysqlResultSet<T> =
@@ -273,7 +289,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     override suspend fun affectedRows(
       params: Iterable<Any?>
     ) = this@MysqlConnection.affectedRows(this, params)
-    override suspend fun aClose() = this@MysqlConnection.close(this)
+    override suspend fun close() = this@MysqlConnection.close(this)
   }
 
   open class MysqlResultSet<T> internal constructor(protected val channel: Channel<T>): Connection.ResultSet<T> {
@@ -311,7 +327,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
         "Buffer size ${bufferSize} is greater than the maximum buffer size of 16777215")
       val channel = AsynchronousSocketChannel.open()
       try {
-        channel.aConnect(address)
+        channel.asyncConnect(address)
         val buffer = ByteBuffer.allocateDirect(bufferSize)
         buffer.order(ByteOrder.LITTLE_ENDIAN).flip()
         val connection = MysqlConnection(channel, buffer)
@@ -336,6 +352,14 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       }
       return String(chars)
     }
+  }
+
+  suspend inline fun <T : Connection<*>?, R> T.use(block: (T) -> R): R {
+    return use(this) { block(this) }
+  }
+
+  suspend inline fun <T : Connection.PreparedStatement<*>?, R> T.use(block: (T) -> R): R {
+    return use(this) { block(this) }
   }
 
 }
