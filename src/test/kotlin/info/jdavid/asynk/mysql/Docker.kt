@@ -33,8 +33,8 @@ object Docker {
     MARIADB_55("library/mariadb:5.5", 8255),
     MARIADB_100("library/mariadb:10.0", 8210),
     MARIADB_101("library/mariadb:10.1", 8211),
-    MARIADB_102("library/mariadb:10.2", 8212)
-//    MARIADB_103("library/mariadb:10.3", 8213)
+    MARIADB_102("library/mariadb:10.2", 8212)/*,
+    MARIADB_103("library/mariadb:10.3", 8213)*/
   }
 
   fun check() {
