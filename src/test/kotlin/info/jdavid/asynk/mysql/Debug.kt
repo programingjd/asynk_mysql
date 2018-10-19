@@ -39,7 +39,7 @@ class Debug {
                   """.trimIndent()
                 )
                 println("adding rows")
-                (1..1000).forEach {
+                (1..100).forEach {
                   connection.affectedRows(
                     """
                     INSERT INTO test (name) VALUES (?)
@@ -57,6 +57,13 @@ class Debug {
                   it.iterator().next()
                 }
                 println(firstName)
+                println("mapping")
+                println(connection.entries<Int, String>(
+                  """
+                    SELECT id, name FROM test
+                  """.trimIndent(),
+                  "id", "name").toMap().
+                  map { "${it.key} -> ${it.value}" }.joinToString("\n"))
                 delay(1000)
               }
             }.join()

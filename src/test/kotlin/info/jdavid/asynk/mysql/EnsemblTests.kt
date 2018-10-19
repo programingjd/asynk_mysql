@@ -3,11 +3,13 @@ package info.jdavid.asynk.mysql
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Disabled
 import java.net.InetSocketAddress
 
 // Ensembl public SQL Servers
 // https;//www.ensembl.org
 // https://www.ensembl.org/info/data/mysql.html
+
 class EnsemblTests {
 
   private val credentials =

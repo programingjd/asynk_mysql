@@ -7,12 +7,13 @@ import info.jdavid.asynk.core.internal.use
 import info.jdavid.asynk.sql.Connection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.toCollection
 import kotlinx.coroutines.channels.toList
 import kotlinx.coroutines.channels.toMap
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 import org.slf4j.LoggerFactory
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -77,48 +78,56 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     return ok.count
   }
 
-  override suspend fun <T> values(sqlStatement: String, columnNameOrAlias: String): MysqlResultSet<T> =
-    values(sqlStatement, emptyList(), columnNameOrAlias)
+  override suspend fun <T> values(sqlStatement: String, columnNameOrAlias: String,
+                                  batchSize: Int): MysqlResultSet<T> =
+    values(sqlStatement, emptyList(), columnNameOrAlias, batchSize)
 
   override suspend fun <K,V> entries(sqlStatement: String,
                                      keyColumnNameOrAlias: String,
-                                     valueColumnNameOrAlias: String): MysqlResultMap<K,V> =
-    entries(sqlStatement, emptyList(), keyColumnNameOrAlias, valueColumnNameOrAlias)
+                                     valueColumnNameOrAlias: String,
+                                     batchSize: Int): MysqlResultMap<K,V> =
+    entries(sqlStatement, emptyList(), keyColumnNameOrAlias, valueColumnNameOrAlias, batchSize)
 
-  override suspend fun rows(sqlStatement: String) = rows(sqlStatement, emptyList())
+  override suspend fun rows(sqlStatement: String, batchSize: Int) = rows(sqlStatement, emptyList(), batchSize)
 
   override suspend fun <T> values(sqlStatement: String, params: Iterable<Any?>,
-                                  columnNameOrAlias: String): MysqlResultSet<T> {
+                                  columnNameOrAlias: String, batchSize: Int): MysqlResultSet<T> {
     val statement = prepare(sqlStatement, true)
-    return values(statement, params, columnNameOrAlias)
+    return values(statement, params, columnNameOrAlias, batchSize)
   }
 
   override suspend fun <K,V> entries(sqlStatement: String, params: Iterable<Any?>,
-                                      keyColumnNameOrAlias: String,
-                                      valueColumnNameOrAlias: String): MysqlResultMap<K,V> {
+                                     keyColumnNameOrAlias: String,
+                                     valueColumnNameOrAlias: String,
+                                     batchSize: Int): MysqlResultMap<K,V> {
     val statement = prepare(sqlStatement, true)
-    return entries(statement, params, keyColumnNameOrAlias, valueColumnNameOrAlias)
+    return entries(statement, params, keyColumnNameOrAlias, valueColumnNameOrAlias, batchSize)
   }
 
-  override suspend fun rows(sqlStatement: String, params: Iterable<Any?>): MysqlResultSet<Map<String,Any?>> {
+  override suspend fun rows(sqlStatement: String, params: Iterable<Any?>,
+                            batchSize: Int): MysqlResultSet<Map<String,Any?>> {
     val statement = prepare(sqlStatement, true)
-    return rows(statement, params)
+    return rows(statement, params, batchSize)
   }
 
   override suspend fun <T> values(preparedStatement: PreparedStatement,
-                                  columnNameOrAlias: String): MysqlResultSet<T> =
-    values(preparedStatement, emptyList(), columnNameOrAlias)
+                                  columnNameOrAlias: String,
+                                  batchSize: Int): MysqlResultSet<T> =
+    values(preparedStatement, emptyList(), columnNameOrAlias, batchSize)
 
   override suspend fun <K,V> entries(preparedStatement: PreparedStatement,
                                      keyColumnNameOrAlias: String,
-                                     valueColumnNameOrAlias: String): MysqlResultMap<K,V> =
-    entries(preparedStatement, emptyList(), keyColumnNameOrAlias, valueColumnNameOrAlias)
+                                     valueColumnNameOrAlias: String,
+                                     batchSize: Int): MysqlResultMap<K,V> =
+    entries(preparedStatement, emptyList(), keyColumnNameOrAlias, valueColumnNameOrAlias, batchSize)
 
-  override suspend fun rows(preparedStatement: PreparedStatement) = rows(preparedStatement, emptyList())
+  override suspend fun rows(preparedStatement: PreparedStatement, batchSize: Int) =
+    rows(preparedStatement, emptyList(), batchSize)
 
   override suspend fun <T> values(preparedStatement: PreparedStatement,
                                   params: Iterable<Any?>,
-                                  columnNameOrAlias: String): MysqlResultSet<T> {
+                                  columnNameOrAlias: String,
+                                  batchSize: Int): MysqlResultSet<T> {
     if (preparedStatement !is MysqlPreparedStatement) throw IllegalArgumentException()
     send(Packet.StatementExecute(preparedStatement.id, preparedStatement.types, params))
     val rs = receive(Packet.BinaryResultSet::class.java)
@@ -128,8 +137,8 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       cols.add(receive(Packet.ColumnDefinition::class.java))
     }
     receive(Packet.EOF::class.java)
-    val channel = Channel<T>(128)
-    CoroutineScope(coroutineContext).launch {
+    val channel = Channel<T>(batchSize)
+    val job = CoroutineScope(coroutineContext).launch {
       var open = true
       while (true) {
         val row = receive(Packet.Row::class.java)
@@ -143,13 +152,14 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       }
       channel.close()
     }
-    return MysqlResultSet(channel)
+    return MysqlResultSet(channel, job)
   }
 
   override suspend fun <K,V> entries(preparedStatement: PreparedStatement,
                                      params: Iterable<Any?>,
                                      keyColumnNameOrAlias: String,
-                                     valueColumnNameOrAlias: String): MysqlResultMap<K,V> {
+                                     valueColumnNameOrAlias: String,
+                                     batchSize: Int): MysqlResultMap<K,V> {
     if (preparedStatement !is MysqlPreparedStatement) throw IllegalArgumentException()
     send(Packet.StatementExecute(preparedStatement.id, preparedStatement.types, params))
     val rs = receive(Packet.BinaryResultSet::class.java)
@@ -159,8 +169,8 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       cols.add(receive(Packet.ColumnDefinition::class.java))
     }
     receive(Packet.EOF::class.java)
-    val channel = Channel<Pair<K,V>>(128)
-    CoroutineScope(coroutineContext).launch {
+    val channel = Channel<Pair<K,V>>(batchSize)
+    val job = CoroutineScope(coroutineContext).launch {
       var open = true
       while (true) {
         val row = receive(Packet.Row::class.java)
@@ -174,11 +184,12 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       }
       channel.close()
     }
-    return MysqlResultMap(channel)
+    return MysqlResultMap(channel, job)
   }
 
   override suspend fun rows(preparedStatement: PreparedStatement,
-                            params: Iterable<Any?>): MysqlResultSet<Map<String,Any?>> {
+                            params: Iterable<Any?>,
+                            batchSize: Int): MysqlResultSet<Map<String,Any?>> {
     if (preparedStatement !is MysqlPreparedStatement) throw IllegalArgumentException()
     send(Packet.StatementExecute(preparedStatement.id, preparedStatement.types, params))
     val rs = receive(Packet.BinaryResultSet::class.java)
@@ -188,8 +199,8 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       cols.add(receive(Packet.ColumnDefinition::class.java))
     }
     receive(Packet.EOF::class.java)
-    val channel = Channel<Map<String, Any?>>(128)
-    CoroutineScope(coroutineContext).launch {
+    val channel = Channel<Map<String, Any?>>(batchSize)
+    val job = CoroutineScope(coroutineContext).launch {
       var open = true
       while (true) {
         val row = receive(Packet.Row::class.java)
@@ -203,7 +214,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       }
       channel.close()
     }
-    return MysqlResultSet(channel)
+    return MysqlResultSet(channel, job)
   }
 
   suspend fun close(preparedStatement: MysqlPreparedStatement) {
@@ -230,9 +241,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     packet.writeTo(buffer.clear() as ByteBuffer)
     (buffer.flip() as ByteBuffer).also {
       while (it.remaining() > 0) {
-        withTimeout(5000L) {
-          channel.asyncWrite(it)
-        }
+        channel.asyncWrite(it)
       }
     }
     buffer.clear().flip()
@@ -249,7 +258,7 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       while (true) {
         buffer.compact()
         val left = buffer.capacity() - buffer.position()
-        val n = withTimeout(5000L) { channel.asyncRead(buffer) }.toInt()
+        val n = channel.asyncRead(buffer).toInt()
         if (n == left) throw RuntimeException("Connection buffer too small.")
         buffer.flip()
         val packet = Packet.fromBytes(buffer, type)
@@ -272,19 +281,24 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
       return info.jdavid.asynk.core.internal.use(this) { block(this) }
     }
 
-    override suspend fun rows() = this@MysqlConnection.rows(this)
-    override suspend fun rows(params: Iterable<Any?>) = this@MysqlConnection.rows(this, params)
-    override suspend fun <T> values(columnNameOrAlias: String): MysqlResultSet<T> =
-      this@MysqlConnection.values(this, columnNameOrAlias)
-    override suspend fun <T> values(params: Iterable<Any?>, columnNameOrAlias: String): MysqlResultSet<T> =
-      this@MysqlConnection.values(this, params, columnNameOrAlias)
+    override suspend fun rows(batchSize: Int) = this@MysqlConnection.rows(this, batchSize)
+    override suspend fun rows(params: Iterable<Any?>, batchSize: Int) =
+      this@MysqlConnection.rows(this, params, batchSize)
+    override suspend fun <T> values(columnNameOrAlias: String, batchSize: Int): MysqlResultSet<T> =
+      this@MysqlConnection.values(this, columnNameOrAlias, batchSize)
+    override suspend fun <T> values(params: Iterable<Any?>,
+                                    columnNameOrAlias: String,
+                                    batchSize: Int): MysqlResultSet<T> =
+      this@MysqlConnection.values(this, params, columnNameOrAlias, batchSize)
     override suspend fun <K,V> entries(keyColumnNameOrAlias: String,
-                                       valueColumnNameOrAlias: String): MysqlResultMap<K,V> =
-      this@MysqlConnection.entries(this, keyColumnNameOrAlias, valueColumnNameOrAlias)
+                                       valueColumnNameOrAlias: String,
+                                       batchSize: Int): MysqlResultMap<K,V> =
+      this@MysqlConnection.entries(this, keyColumnNameOrAlias, valueColumnNameOrAlias, batchSize)
     override suspend fun <K,V> entries(params: Iterable<Any?>,
                                        keyColumnNameOrAlias: String,
-                                       valueColumnNameOrAlias: String): MysqlResultMap<K,V> =
-      this@MysqlConnection.entries(this, params, keyColumnNameOrAlias, valueColumnNameOrAlias)
+                                       valueColumnNameOrAlias: String,
+                                       batchSize: Int): MysqlResultMap<K,V> =
+      this@MysqlConnection.entries(this, params, keyColumnNameOrAlias, valueColumnNameOrAlias, batchSize)
     override suspend fun affectedRows() = this@MysqlConnection.affectedRows(this)
     override suspend fun affectedRows(
       params: Iterable<Any?>
@@ -292,16 +306,24 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
     override suspend fun close() = this@MysqlConnection.close(this)
   }
 
-  open class MysqlResultSet<T> internal constructor(protected val channel: Channel<T>): Connection.ResultSet<T> {
+  open class MysqlResultSet<T> internal constructor(
+    protected val channel: Channel<T>, private val job: Job
+  ): Connection.ResultSet<T> {
     override operator fun iterator() = channel.iterator()
-    override fun close() { channel.cancel() }
+    override suspend fun close() {
+      channel.cancel()
+      job.cancelAndJoin()
+    }
     override suspend fun toList() = use { channel.toList() }
     override suspend fun <C : MutableCollection<in T>> toCollection(destination: C) =
       use { channel.toCollection(destination) }
+    suspend inline fun <R> use(block: (MysqlResultSet<T>) -> R): R {
+      return info.jdavid.asynk.core.internal.use(this) { block(this) }
+    }
   }
 
-  class MysqlResultMap<K,V> internal constructor(channel: Channel<Pair<K,V>>):
-        MysqlResultSet<Pair<K,V>>(channel), Connection.ResultMap<K,V> {
+  class MysqlResultMap<K,V> internal constructor(channel: Channel<Pair<K,V>>, job: Job):
+        MysqlResultSet<Pair<K,V>>(channel, job), Connection.ResultMap<K,V> {
     override suspend fun toMap() = use { channel.toMap() }
     override suspend fun <M : MutableMap<in K, in V>> toMap(destination: M) =
       use { channel.toMap(destination) }
@@ -359,6 +381,10 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
   }
 
   suspend inline fun <T : Connection.PreparedStatement<*>?, R> T.use(block: (T) -> R): R {
+    return use(this) { block(this) }
+  }
+
+  suspend inline fun <T : Connection.ResultSet<*>?, R> T.use(block: (T) -> R): R {
     return use(this) { block(this) }
   }
 

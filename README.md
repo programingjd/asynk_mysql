@@ -34,6 +34,13 @@ dependencies {
 }
 ```
 
+## Limitations ##
+
+ - Sending or receiving
+[packets larger than 16MB](https://dev.mysql.com/doc/internals/en/sending-more-than-16mbyte.html)
+is not supported.
+ - SSL is not supported.
+
 ## Usage ##
 
 __Connecting__
