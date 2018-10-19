@@ -1,5 +1,6 @@
 package info.jdavid.asynk.mysql
 
+import java.lang.NullPointerException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -231,19 +232,19 @@ internal sealed class Packet {
     override fun toString() = "ResultSet(${columnCount})"
   }
 
-  class Row(internal val bytes: ByteArray?): FromServer, Packet() {
+  class Row(internal val bytes: ByteBuffer?): FromServer, Packet() {
     override fun toString(): String {
       return if (bytes == null) {
         "EOF()"
       }
       else {
-        "Row(${MysqlConnection.hex(bytes)})"
+        "Row(${bytes.remaining()})"
       }
     }
     internal fun decode(cols: List<ColumnDefinition>): Map<String,Any?> {
       val n = cols.size
       if (n == 0) return emptyMap()
-      val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+      val buffer = bytes ?: throw NullPointerException()
       val bitmap =  Bitmap(n, 2).set(buffer)
       val map = LinkedHashMap<String,Any?>(n)
       for (i in 0 until n) {
@@ -260,7 +261,7 @@ internal sealed class Packet {
         @Suppress("UNCHECKED_CAST")
         return null as T
       }
-      val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+      val buffer = bytes ?: throw NullPointerException()
       val bitmap =  Bitmap(n, 2).set(buffer)
       var value: Any? = null
       for (i in 0 until n) {
@@ -281,7 +282,7 @@ internal sealed class Packet {
         @Suppress("UNCHECKED_CAST")
         return null as K to null as V
       }
-      val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+      val buffer = bytes ?: throw NullPointerException()
       val bitmap =  Bitmap(n, 2).set(buffer)
       var key: Any? = null
       var value: Any? = null
@@ -442,8 +443,12 @@ internal sealed class Packet {
           }
           else {
             assert(first == 0x00.toByte())
-            val bytes = ByteArray(start + length - buffer.position()).apply { buffer.get(this) }
-            Row(bytes) as T
+            val slice = buffer.slice()
+            slice.limit(start + length - buffer.position())
+            slice.order(ByteOrder.LITTLE_ENDIAN)
+            Row(buffer) as T
+            //val bytes = ByteArray(start + length - buffer.position()).apply { buffer.get(this) }
+            //Row(bytes) as T
           }
         }
         Handshake::class.java -> {
