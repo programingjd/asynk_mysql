@@ -1,9 +1,9 @@
 package info.jdavid.asynk.mysql
 
+import info.jdavid.asynk.sql.*
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.Disabled
 import java.net.InetSocketAddress
 
 // Ensembl public SQL Servers

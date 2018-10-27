@@ -10,9 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.toCollection
-import kotlinx.coroutines.channels.toList
-import kotlinx.coroutines.channels.toMap
+import kotlinx.coroutines.channels.ChannelIterator
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.net.InetAddress
@@ -309,25 +307,22 @@ class MysqlConnection internal constructor(private val channel: AsynchronousSock
   open class MysqlResultSet<T> internal constructor(
     protected val channel: Channel<T>, private val job: Job
   ): Connection.ResultSet<T> {
-    override operator fun iterator() = channel.iterator()
+    override suspend fun <R> iterate(block: suspend (ChannelIterator<T>) -> R): R {
+      return use {
+        block(channel.iterator())
+      }
+    }
     override suspend fun close() {
       channel.cancel()
       job.cancelAndJoin()
     }
-    override suspend fun toList() = use { channel.toList() }
-    override suspend fun <C : MutableCollection<in T>> toCollection(destination: C) =
-      use { channel.toCollection(destination) }
     suspend inline fun <R> use(block: (MysqlResultSet<T>) -> R): R {
       return info.jdavid.asynk.core.internal.use(this) { block(this) }
     }
   }
 
   class MysqlResultMap<K,V> internal constructor(channel: Channel<Pair<K,V>>, job: Job):
-        MysqlResultSet<Pair<K,V>>(channel, job), Connection.ResultMap<K,V> {
-    override suspend fun toMap() = use { channel.toMap() }
-    override suspend fun <M : MutableMap<in K, in V>> toMap(destination: M) =
-      use { channel.toMap(destination) }
-  }
+        MysqlResultSet<Pair<K,V>>(channel, job), Connection.ResultMap<K,V>
 
   companion object {
     /**

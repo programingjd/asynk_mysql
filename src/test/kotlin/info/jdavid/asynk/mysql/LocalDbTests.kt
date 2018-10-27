@@ -1,5 +1,6 @@
 package info.jdavid.asynk.mysql
 
+import info.jdavid.asynk.sql.*
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.*
@@ -85,8 +86,7 @@ class LocalDbTests {
           """
             SELECT * FROM test ORDER BY name
           """.trimIndent()
-        ).use { rs ->
-          val iterator = rs.iterator()
+        ).iterate { iterator ->
           assertTrue(iterator.hasNext())
           iterator.next().apply {
             assertEquals("Name1", this["name"])
@@ -133,8 +133,7 @@ class LocalDbTests {
             SELECT * FROM test ORDER BY name
           """.trimIndent(),
           "active"
-        ).use { rs ->
-          val iterator = rs.iterator()
+        ).iterate { iterator ->
           assertTrue(iterator.hasNext())
           assertFalse(iterator.next())
           assertTrue(iterator.hasNext())
@@ -161,8 +160,7 @@ class LocalDbTests {
           """.trimIndent(),
           "name",
           "active"
-        ).use { rs ->
-          val iterator = rs.iterator()
+        ).iterate { iterator ->
           assertTrue(iterator.hasNext())
           iterator.next().apply {
             assertEquals("Name1", first)
