@@ -78,13 +78,13 @@ val count: Int =
   }
 
 val ids = ArrayList<Int>(count)
-connection.values("SELECT * FROM table WHERE id > ?", listOf(max), "id").use { it.toList(ids) }
+connection.values("SELECT * FROM table WHERE id > ?", listOf(max), "id").toList(ids)
 
 val names = Map<Int,String?>(count)
-connection.entries("SELECT id, name FROM table", "id", "name").use { it.toMap(map) }
+connection.entries("SELECT id, name FROM table", "id", "name").toMap(map)
 
 val json = com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
-  connection.rows("SELECT * FROM table").use { it.toList(ids) }
+  connection.rows("SELECT * FROM table").toList(ids)
 )
 ```
 
